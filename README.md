@@ -28,7 +28,7 @@ git clone -b 3.0release https://gitee.com/ossrs/srs.git &&
 cd srs/trunk && ./configure && make && ./objs/srs -c conf/srs.conf
 ```
 
-Open [http://localhost:8080/](http://localhost:8080/) to check it, then publish 
+Open [http://localhost:8080/](http://localhost:8080/) to check it, then publish
 [stream](https://github.com/ossrs/srs/blob/3.0release/trunk/doc/source.flv) by:
 
 ```bash
@@ -97,7 +97,7 @@ Other important wiki:
 - [x] Support listening at multiple ports.
 - [x] Support forwarding([CN][v3_CN_Forward], [EN][v3_EN_Forward]) from master to slave server.
 - [x] Support transcoding([CN][v3_CN_FFMPEG], [EN][v3_EN_FFMPEG]) live streaming by FFMPEG.
-- [x] All wikis are writen in [Chinese][v3_CN_Home] and [English][v3_EN_Home]. 
+- [x] All wikis are writen in [Chinese][v3_CN_Home] and [English][v3_EN_Home].
 - [x] Enhanced json, replace NXJSON(LGPL) with json-parser(BSD), read [#904][bug #904].
 - [x] Support valgrind and latest ARM by patching ST, read [ST#1](https://github.com/ossrs/state-threads/issues/1) and [ST#2](https://github.com/ossrs/state-threads/issues/2).
 - [x] Support tracable and session-based log([CN][v1_CN_SrsLog], [EN][v1_EN_SrsLog]).
@@ -340,6 +340,10 @@ Other important wiki:
 
 ## V2 changes
 
+* <strong>v2.0, 2021-07-04, [2.0 release9(2.0.274)](https://github.com/ossrs/srs/releases/tag/v2.0-r10) released. 87575 lines.</strong>
+* v2.0, 2021-07-04, For [#2424](https://github.com/ossrs/srs/issues/2424), use srandom/random to generate. 2.0.274
+* <strong>v2.0, 2021-06-26, [2.0 release9(2.0.273)](https://github.com/ossrs/srs/releases/tag/v2.0-r9) released. 87552 lines.</strong>
+* v2.0, 2021-06-25, For [#2424](https://github.com/ossrs/srs/issues/2424), query the latest available version. 2.0.273
 * <strong>v2.0, 2020-01-25, [2.0 release8(2.0.272)][r2.0r8] released. 87292 lines.</strong>
 * v2.0, 2020-01-08, Merge [#1554][bug #1554], support logrotate copytruncate. 2.0.272
 * v2.0, 2020-01-05, Merge [#1551][bug #1551], fix memory leak in RTSP stack. 2.0.270
@@ -361,7 +365,7 @@ Other important wiki:
 * v2.0, 2018-10-08, Merge [#1236][bug #1236], Fix sleep bug in us. 2.0.257
 * v2.0, 2018-10-08, Merge [#1237][bug #1237], Support param for transcoder. 2.0.256
 * <strong>v2.0, 2018-08-12, [2.0 release4(2.0.255)][r2.0r4] released. 86915 lines.</strong>
-* v2.0, 2018-08-12, For [#1202][bug #1202], Support edge/forward to Aliyun CDN. 2.0.255 
+* v2.0, 2018-08-12, For [#1202][bug #1202], Support edge/forward to Aliyun CDN. 2.0.255
 * v2.0, 2018-08-11, For [#910][bug #910], Support HTTP FLV with HTTP callback. 2.0.254
 * v2.0, 2018-08-11, For [#1110][bug #1110], Refine params in http callback. 2.0.253
 * v2.0, 2018-08-05, Refine HTTP-FLV latency, support realtime mode. 2.0.252
@@ -593,7 +597,7 @@ Other important wiki:
 * v1.0, 2014-10-08, fix [#151][bug #151], always reap ts whatever audio or video packet. 0.9.223.
 * v1.0, 2014-10-08, fix [#162][bug #162], failed if no epoll. 0.9.222.
 * v1.0, 2014-09-30, fix [#180][bug #180], crash for multiple edge publishing the same stream. 0.9.220.
-* v1.0, 2014-09-26, fix hls bug, refine config and log, according to clion of jetbrains. 0.9.216. 
+* v1.0, 2014-09-26, fix hls bug, refine config and log, according to clion of jetbrains. 0.9.216.
 * v1.0, 2014-09-25, fix [#177][bug #177], dvr segment add config dvr_wait_keyframe. 0.9.213.
 * v1.0, 2014-08-28, fix [#167][bug #167], add openssl includes to utest. 0.9.209.
 * v1.0, 2014-08-27, max connections is 32756, for st use mmap default. 0.9.209
@@ -680,7 +684,7 @@ Other important wiki:
 * v1.0, 2014-04-03, implements http framework and api/v1/version.
 * v1.0, 2014-03-30, fix bug for st detecting epoll failed, force st to use epoll.
 * v1.0, 2014-03-29, add wiki [Performance for RaspberryPi][v1_CN_RaspberryPi].
-* v1.0, 2014-03-29, add release binary package for raspberry-pi. 
+* v1.0, 2014-03-29, add release binary package for raspberry-pi.
 * v1.0, 2014-03-26, support RTMP ATC for HLS/HDS to support backup(failover).
 * v1.0, 2014-03-23, support daemon, default start in daemon.
 * v1.0, 2014-03-22, support make install/install-api and uninstall.
@@ -916,7 +920,7 @@ Comparing with other media servers, SRS is much better and stronger, for details
 |   WIKI(EN+CN) |   Stable  |  EN only  |   X       |   X       |   Stable  |
 
 <a name="others"></a>
-**Others** 
+**Others**
 
 |   Feature     |   SRS     |   NGINX   | CRTMPD    | AMS       |   WOWZA   |
 |   ----------- |   ------- |   -----   | --------- | --------  |   ------  |
@@ -1006,8 +1010,8 @@ The latency between encoder and player with realtime config([CN][v3_CN_LowLatenc
 
 > 2018-08-05, [c45f72e](https://github.com/ossrs/srs/commit/c45f72ef7bac9c7cf85b9125fc9e3aafd53f396f), Refine HTTP-FLV latency, support realtime mode. 2.0.252
 
-We used FMLE as encoder for benchmark. The latency of server was 0.1s+, 
-and the bottleneck was the encoder. For more information, read 
+We used FMLE as encoder for benchmark. The latency of server was 0.1s+,
+and the bottleneck was the encoder. For more information, read
 [bug #257][bug #257-c0].
 
 <a name="hls-overhead"></a>
@@ -1799,4 +1803,3 @@ Winlin
 [branch2]: https://github.com/ossrs/srs/tree/2.0release
 [release2]: https://github.com/ossrs/srs/wiki/v1_CN_Product#release20
 [release3]: https://github.com/ossrs/srs/wiki/v1_CN_Product#release30
-
