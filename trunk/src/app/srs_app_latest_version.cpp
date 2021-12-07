@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <srs_app_http_conn.hpp>
 #include <srs_app_http_client.hpp>
 #include <srs_app_utility.hpp>
+#include <srs_app_uuid.hpp>
 
 #include <unistd.h>
 #include <sstream>
@@ -54,12 +55,16 @@ int SrsLatestVersion::start()
         return ERROR_SUCCESS;
     }
 
-    char buf[16];
-    srs_random_generate(buf, sizeof(buf));
-    for (int i = 0; i < (int)sizeof(buf); i++) {
-        buf[i] = 'a' + uint8_t(buf[i])%25;
+    if (true) {
+        uuid_t uuid;
+        uuid_generate_time(uuid);
+
+        char buf[32];
+        for (int i = 0; i < 16; i++) {
+            snprintf(buf + i * 2, sizeof(buf), "%02x", uuid[i]);
+        }
+        server_id_ = string(buf, sizeof(buf));
     }
-    server_id_ = string(buf, sizeof(buf));
 
     return trd_->start();
 }
@@ -68,14 +73,14 @@ int SrsLatestVersion::cycle()
 {
     int ret = ERROR_SUCCESS;
 
-    int64_t starttime = srs_update_system_time_ms();
-    ret = query_latest_version(); // Ignore any error.
-
     uint64_t first_random_wait = 0;
     srs_random_generate((char*)&first_random_wait, 8);
-    first_random_wait = (first_random_wait + starttime + getpid()) % (60 * 60); // in s.
+    first_random_wait = (first_random_wait + srs_update_system_time_ms() + getpid()) % (5 * 60); // in s.
 
-    srs_trace("Startup query id=%s, eip=%s, match=%s, stable=%s, wait=%ds, cost=%dms, ret=%d", server_id_.c_str(), srs_get_public_internet_address().c_str(), match_version_.c_str(), stable_version_.c_str(), (int)first_random_wait, (int)(srs_update_system_time_ms() - starttime), ret);
+    // Only report after 5+ minutes.
+    first_random_wait += 5 * 60;
+
+    srs_trace("Startup query id=%s, eip=%s, wait=%ds", server_id_.c_str(), srs_get_public_internet_address().c_str(), (int)first_random_wait);
     st_usleep(first_random_wait * 1000 * 1000);
 
     while (true) {
@@ -99,7 +104,8 @@ int SrsLatestVersion::query_latest_version()
           << "version=v" << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_REVISION
           << "&id=" << server_id_
           << "&eip=" << srs_get_public_internet_address()
-          << "&ts=" << srs_get_system_time_ms();
+          << "&ts=" << srs_get_system_time_ms()
+          << "&alive=" << (srs_get_system_time_ms() - srs_get_system_startup_time_ms()) / 1000;
     string url = ss.str();
 
     SrsHttpUri uri;
