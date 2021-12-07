@@ -842,7 +842,11 @@ srs_error_t SrsServer::http_handle()
     if ((err = http_api_mux->handle("/api/v1/clusters", new SrsGoApiClusters())) != srs_success) {
         return srs_error_wrap(err, "handle clusters");
     }
-    
+
+    if ((err = http_api_mux->handle("/api/v1/forward/", new SrsGoApiForwarder(this))) != srs_success) {
+        return srs_error_wrap(err, "handle clusters");
+    }
+
     // test the request info.
     if ((err = http_api_mux->handle("/api/v1/tests/requests", new SrsGoApiRequests())) != srs_success) {
         return srs_error_wrap(err, "handle tests requests");

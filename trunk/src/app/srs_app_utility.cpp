@@ -1434,3 +1434,41 @@ string srs_getenv(string key)
     return "";
 }
 
+unsigned char srs_hex_to_char(unsigned char x)
+{
+    unsigned char y = '0';
+
+    if (x >= 'A' && x <= 'Z') {
+        y = x - 'A' + 10;
+    } else if (x >= 'a' && x <= 'z') {
+        y = x - 'a' + 10;
+    } else if (x >= '0' && x <= '9') {
+        y = x - '0';
+    }
+
+    return y;
+}
+
+std::string srs_string_url_decode(std::string url)
+{
+    std::string ret = "";
+
+    size_t length = url.length();
+    for (size_t i = 0; i < length; i++) {
+        if (url[i] == '+') {
+            ret += ' ';
+        } else if (url[i] == '%') {
+            if (i + 2 > length) {
+                return ret;
+            }
+
+            unsigned char high = srs_hex_to_char((unsigned char)url[++i]);
+            unsigned char low = srs_hex_to_char((unsigned char)url[++i]);
+            ret += high * 16 + low;
+        } else {
+            ret += url[i];
+        }
+    }
+
+    return ret;
+}

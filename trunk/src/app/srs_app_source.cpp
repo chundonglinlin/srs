@@ -1508,6 +1508,38 @@ void SrsOriginHub::destroy_forwarders()
     forwarders.clear();
 }
 
+srs_error_t SrsOriginHub::create_forwarder(std::string url)
+{
+    srs_error_t err = srs_success;
+
+    // maybe ignore delete
+    SrsRequest* freq = new SrsRequest();
+    srs_parse_rtmp_url(url, freq->tcUrl, freq->stream);
+    srs_discovery_tc_url(freq->tcUrl, freq->schema, freq->host, freq->vhost, freq->app, freq->stream, freq->port, freq->param);
+
+    SrsForwarder* forwarder = new SrsForwarder(this);
+    forwarders.push_back(forwarder);
+
+    std::stringstream ss;
+    ss << freq->host << ":" << freq->port;
+    std::string forward_server = ss.str();
+
+    // initialize the forwarder with request.
+    if ((err = forwarder->initialize(freq, forward_server)) != srs_success) {
+        return srs_error_wrap(err, "init forwarder");
+    }
+
+    srs_utime_t queue_size = _srs_config->get_queue_length(req->vhost);
+    forwarder->set_queue_size(queue_size);
+
+    if ((err = forwarder->on_publish()) != srs_success) {
+        return srs_error_wrap(err, "start forwarder failed, vhost=%s, app=%s, stream=%s, forward-to=%s",
+            req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), url.c_str());
+    }
+
+    return err;
+}
+
 SrsMetaCache::SrsMetaCache()
 {
     meta = video = audio = NULL;
@@ -1737,6 +1769,25 @@ srs_error_t SrsLiveSourceManager::fetch_or_create(SrsRequest* r, ISrsLiveSourceH
 
 failed:
     srs_freep(source);
+    return err;
+}
+
+srs_error_t SrsLiveSourceManager::fetch_source(string stream_url, SrsLiveSource** pps)
+{
+    srs_error_t err = srs_success;
+
+    // Use lock to protect coroutine switch.
+    // @bug https://github.com/ossrs/srs/issues/1230
+    // TODO: FIXME: Use smaller lock.
+    SrsLocker(lock);
+
+    if (pool.find(stream_url) == pool.end()) {
+        err = srs_error_wrap(err, "fetch source %s", stream_url.c_str());
+        return err;
+    }
+
+    *pps = pool[stream_url];
+
     return err;
 }
 
@@ -2674,3 +2725,7 @@ string SrsLiveSource::get_curr_origin()
     return play_edge->get_curr_origin();
 }
 
+srs_error_t SrsLiveSource::create_forwarder(string url)
+{
+    return hub->create_forwarder(url);
+}

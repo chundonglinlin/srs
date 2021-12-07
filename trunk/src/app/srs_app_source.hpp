@@ -376,6 +376,8 @@ public:
 private:
     virtual srs_error_t create_forwarders();
     virtual void destroy_forwarders();
+public:
+    virtual srs_error_t create_forwarder(std::string url);
 };
 
 // Each stream have optional meta(sps/pps in sequence header and metadata).
@@ -448,6 +450,8 @@ public:
     // @param h the event handler for source.
     // @param pps the matched source, if success never be NULL.
     virtual srs_error_t fetch_or_create(SrsRequest* r, ISrsLiveSourceHandler* h, SrsLiveSource** pps);
+    // fetch source by url
+    virtual srs_error_t fetch_source(std::string stream_url, SrsLiveSource** pps);
 private:
     // Get the exists source, NULL when not exists.
     // update the request and return the exists source.
@@ -599,6 +603,8 @@ public:
     virtual void on_edge_proxy_unpublish();
 public:
     virtual std::string get_curr_origin();
+    // create forwarder by url
+    virtual srs_error_t create_forwarder(std::string url);
 };
 
 #endif

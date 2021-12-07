@@ -963,6 +963,81 @@ srs_error_t SrsGoApiClusters::serve_http(ISrsHttpResponseWriter* w, ISrsHttpMess
     return srs_api_response(w, r, obj->dumps());
 }
 
+SrsGoApiForwarder::SrsGoApiForwarder(SrsServer* svr)
+{
+    server_ = svr;
+}
+
+SrsGoApiForwarder::~SrsGoApiForwarder()
+{
+}
+
+srs_error_t SrsGoApiForwarder::serve_http(ISrsHttpResponseWriter* w, ISrsHttpMessage* r)
+{
+    srs_error_t err = srs_success;
+
+    // parse param for req
+    // pattern=/api/v1/forward/[app]/[stream]?[vhost=]&remote=rtmp%3A%2F%2Fdomain%3Aport%2Fapp%2Fstream%3Fvhost%3Dtest.com%26params%3Dauth
+    // For forward stream to other server, the template must have the same schema with upath.
+    // The template is defined in config, the mout of http stream. The upath is specified by http request path.
+    // If template is "/[app]/[stream]?[vhost=]&remote=", the upath should be:
+    //      matched for "/live/livestream?remote="
+    //      matched for "/live/livestream?vhost=&remote="
+
+    std::string remote_url = srs_string_url_decode(r->query_get("remote"));
+    if(remote_url.empty()) {
+        return srs_api_response_code(w, r, ERROR_RTMP_FORWARD_PARAM_ERROR);
+    }
+
+    // check remote url valid and reconstruct
+    //  1. pattern=domain
+    //  2. pattern=domain:port
+    //  3. pattern=rtmp://domain:port/app/stream?vhost=test.com&params=auth
+
+    std::string vhost = r->query_get("vhost");
+    if (vhost.empty()) {
+        vhost = SRS_CONSTS_RTMP_DEFAULT_VHOST;
+    }
+
+    // pattern=/api/v1/forward/[app]/[stream]
+    std::string upath = r->path();
+    if (srs_string_count(upath, "/") != 5) {
+        return srs_api_response_code(w, r, ERROR_RTMP_FORWARD_PARAM_ERROR);
+    }
+
+    std::string app, stream;
+    size_t pos = string::npos;
+    if ((pos = upath.rfind("/")) != string::npos) {
+        stream = upath.substr(pos + 1);
+        upath = upath.substr(0, pos);
+        if ((pos = upath.rfind("/")) != string::npos) {
+            app = upath.substr(pos + 1);
+        } else {
+            return srs_api_response_code(w, r, ERROR_RTMP_FORWARD_PARAM_ERROR);
+        }
+    } else {
+        return srs_api_response_code(w, r, ERROR_RTMP_FORWARD_PARAM_ERROR);
+    }
+
+    std::string stream_url = srs_generate_stream_url(vhost, app, stream);
+
+    // find a source to serve.
+    SrsLiveSource* source = NULL;
+    if ((err = _srs_sources->fetch_source(stream_url, &source)) != srs_success) {
+        return srs_api_response_code(w, r, ERROR_RTMP_FORWARD_NOT_FOUND);
+    }
+    srs_assert(source != NULL);
+
+    // create forwarder to source
+    if ((err = source->create_forwarder(remote_url)) != srs_success) {
+        int code = srs_error_code(err);
+        srs_error_reset(err);
+        return srs_api_response_code(w, r, code);
+    }
+
+    return srs_api_response_code(w, r, ERROR_SUCCESS);
+}
+
 SrsGoApiError::SrsGoApiError()
 {
 }
