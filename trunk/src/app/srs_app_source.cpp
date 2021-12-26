@@ -1468,20 +1468,54 @@ srs_error_t SrsOriginHub::on_reload_vhost_exec(string vhost)
 srs_error_t SrsOriginHub::create_forwarders()
 {
     srs_error_t err = srs_success;
-    
+
+    // pattern: app/stream
+    SrsConfDirective* conf = _srs_config->get_forwards(req->vhost, req->app, req->stream);
+    for (int i = 0; conf && i < (int)conf->args.size(); i++) {
+        std::string url = conf->args.at(i);
+
+        // create forwarder by url
+        SrsRequest* freq = new SrsRequest();
+        srs_parse_rtmp_url(url, freq->tcUrl, freq->stream);
+        srs_discovery_tc_url(freq->tcUrl, freq->schema, freq->host, freq->vhost, freq->app, freq->stream, freq->port, freq->param);
+
+        SrsForwarder* forwarder = new SrsForwarder(this);
+        forwarders.push_back(forwarder);
+
+        std::stringstream ss;
+        ss << freq->host << ":" << freq->port;
+        std::string forward_server = ss.str();
+
+        // initialize the forwarder with request.
+        if ((err = forwarder->initialize(freq, forward_server)) != srs_success) {
+            return srs_error_wrap(err, "init forwarder");
+        }
+
+        srs_utime_t queue_size = _srs_config->get_queue_length(req->vhost);
+        forwarder->set_queue_size(queue_size);
+
+        if ((err = forwarder->on_publish()) != srs_success) {
+            return srs_error_wrap(err, "start forwarder failed, vhost=%s, app=%s, stream=%s, forward-to=%s",
+                req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), url.c_str());
+        }
+    }
+
     if (!_srs_config->get_forward_enabled(req->vhost)) {
         return err;
     }
     
-    SrsConfDirective* conf = _srs_config->get_forwards(req->vhost);
+    conf = _srs_config->get_forwards(req->vhost);
     for (int i = 0; conf && i < (int)conf->args.size(); i++) {
         std::string forward_server = conf->args.at(i);
-        
+
+        // copy source req
+        SrsRequest* freq = req->copy();
+
         SrsForwarder* forwarder = new SrsForwarder(this);
         forwarders.push_back(forwarder);
         
         // initialize the forwarder with request.
-        if ((err = forwarder->initialize(req, forward_server)) != srs_success) {
+        if ((err = forwarder->initialize(freq, forward_server)) != srs_success) {
             return srs_error_wrap(err, "init forwarder");
         }
 

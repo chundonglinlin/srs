@@ -2914,6 +2914,7 @@ VOID TEST(ConfigMainTest, CheckVhostConfig2)
         EXPECT_EQ(5000000, conf.get_publish_normal_timeout("ossrs.net"));
         EXPECT_FALSE(conf.get_forward_enabled("ossrs.net"));
         EXPECT_TRUE(conf.get_forwards("ossrs.net") == NULL);
+        EXPECT_TRUE(conf.get_forwards("ossrs.net", "live", "livestream") == NULL);
     }
 
     if (true) {
@@ -2926,6 +2927,12 @@ VOID TEST(ConfigMainTest, CheckVhostConfig2)
         MockSrsConfig conf;
         HELPER_ASSERT_SUCCESS(conf.parse(_MIN_OK_CONF "vhost ossrs.net{forward {enabled on;}}"));
         EXPECT_TRUE(conf.get_forward_enabled("ossrs.net"));
+    }
+
+    if (true) {
+        MockSrsConfig conf;
+        HELPER_ASSERT_SUCCESS(conf.parse(_MIN_OK_CONF "vhost ossrs.net{forward live/livestream {destination xxx;}}"));
+        EXPECT_TRUE(conf.get_forwards("ossrs.net", "live", "livestream"));
     }
 
     if (true) {

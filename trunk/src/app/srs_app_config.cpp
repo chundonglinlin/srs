@@ -4548,7 +4548,7 @@ bool SrsConfig::get_forward_enabled(SrsConfDirective* vhost)
 {
     static bool DEFAULT = false;
 
-    SrsConfDirective* conf = vhost->get("forward");
+    SrsConfDirective* conf = vhost->get("forward", "");
     if (!conf) {
         return DEFAULT;
     }
@@ -4568,11 +4568,27 @@ SrsConfDirective* SrsConfig::get_forwards(string vhost)
         return NULL;
     }
     
-    conf = conf->get("forward");
+    conf = conf->get("forward", "");
     if (!conf) {
         return NULL;
     }
     
+    return conf->get("destination");
+}
+
+SrsConfDirective* SrsConfig::get_forwards(string vhost, string app, string stream)
+{
+    SrsConfDirective* conf = get_vhost(vhost);
+    if (!conf) {
+        return NULL;
+    }
+
+    string pattern = app + "/" + stream;
+    conf = conf->get("forward", pattern);
+    if (!conf || conf->arg0().empty()) {
+        return NULL;
+    }
+
     return conf->get("destination");
 }
 

@@ -604,7 +604,8 @@ public:
     virtual bool get_forward_enabled(SrsConfDirective* vhost);
     // Get the forward directive of vhost.
     virtual SrsConfDirective* get_forwards(std::string vhost);
-
+    // Get the forward url directive of vhost.
+    virtual SrsConfDirective* get_forwards(std::string vhost, std::string app, std::string stream);
 public:
     // Whether the srt sevice enabled
     virtual bool get_srt_enabled();
