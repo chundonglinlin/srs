@@ -2921,7 +2921,7 @@ VOID TEST(ConfigMainTest, CheckVhostConfig2)
         MockSrsConfig conf;
         HELPER_ASSERT_SUCCESS(conf.parse(_MIN_OK_CONF "vhost ossrs.net{forward {destination xxx;backend xxx;}}"));
         EXPECT_TRUE(conf.get_forwards("ossrs.net") != NULL);
-        EXPECT_TRUE(conf.get_forward_backend("ossrs.net") == NULL);
+        EXPECT_TRUE(conf.get_forward_backend("ossrs.net") != NULL);
     }
 
     if (true) {
