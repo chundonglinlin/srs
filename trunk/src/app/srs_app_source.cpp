@@ -1483,37 +1483,41 @@ srs_error_t SrsOriginHub::create_forwarders()
             std::string forward_backend = conf->args.at(i);
 
             // create forward by backend
-            std::string url;
-            if ((err = SrsHttpHooks::on_forward_backend(forward_backend, req, url)) != srs_success) {
+            std::vector<std::string> urls;
+            if ((err = SrsHttpHooks::on_forward_backend(forward_backend, req, urls)) != srs_success) {
                 // ignore
-                srs_error("get backend failed, %s", srs_error_desc(err).c_str());
+                srs_trace("get backend failed, %s", srs_error_desc(err).c_str());
                 continue;
             }
 
-            // create forwarder by url
-            SrsRequest* freq = new SrsRequest();
-            srs_parse_rtmp_url(url, freq->tcUrl, freq->stream);
-            srs_discovery_tc_url(freq->tcUrl, freq->schema, freq->host, freq->vhost, freq->app, freq->stream, freq->port, freq->param);
+            std::vector<std::string>::iterator it;
+            for (it = urls.begin(); it != urls.end(); ++it) {
+                string url = *it;
 
-            SrsForwarder* forwarder = new SrsForwarder(this);
-            forwarders.push_back(forwarder);
+                // create forwarder by url
+                SrsRequest* freq = new SrsRequest();
+                srs_parse_rtmp_url(url, freq->tcUrl, freq->stream);
+                srs_discovery_tc_url(freq->tcUrl, freq->schema, freq->host, freq->vhost, freq->app, freq->stream, freq->port, freq->param);
 
-            std::stringstream ss;
-            ss << freq->host << ":" << freq->port;
-            std::string forward_server = ss.str();
+                SrsForwarder* forwarder = new SrsForwarder(this);
+                forwarders.push_back(forwarder);
 
-            // initialize the forwarder with request.
-            if ((err = forwarder->initialize(freq, forward_server)) != srs_success) {
-                return srs_error_wrap(err, "init forwarder");
-            }
+                std::stringstream ss;
+                ss << freq->host << ":" << freq->port;
+                std::string forward_server = ss.str();
 
-            forwarder->set_queue_size(queue_size);
-            if ((err = forwarder->on_publish()) != srs_success) {
-                return srs_error_wrap(err, "start backend forwarder failed, vhost=%s, app=%s, stream=%s, forward-to=%s",
-                    req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), forward_server.c_str());
+                // initialize the forwarder with request.
+                if ((err = forwarder->initialize(freq, forward_server)) != srs_success) {
+                    return srs_error_wrap(err, "init forwarder");
+                }
+
+                forwarder->set_queue_size(queue_size);
+                if ((err = forwarder->on_publish()) != srs_success) {
+                    return srs_error_wrap(err, "start backend forwarder failed, vhost=%s, app=%s, stream=%s, forward-to=%s",
+                        req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), forward_server.c_str());
+                }
             }
         }
-
     }
 
     conf = _srs_config->get_forwards(req->vhost);

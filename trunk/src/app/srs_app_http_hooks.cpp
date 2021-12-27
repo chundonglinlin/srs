@@ -482,7 +482,7 @@ srs_error_t SrsHttpHooks::discover_co_workers(string url, string& host, int& por
     return err;
 }
 
-srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, string& rtmp_url)
+srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, std::vector<std::string>& rtmp_urls)
 {
     srs_error_t err = srs_success;
 
@@ -507,13 +507,51 @@ srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, string
     std::string res;
     int status_code;
 
+    srs_trace("http: on_forward_backend: data=%s", data.c_str());
+
     SrsHttpClient http;
     if ((err = do_post(&http, url, data, status_code, res)) != srs_success) {
         return srs_error_wrap(err, "http: on_forward_backend failed, client_id=%s, url=%s, request=%s, response=%s, code=%d",
             cid.c_str(), url.c_str(), data.c_str(), res.c_str(), status_code);
     }
 
-    // ret : {"data": [{url:""},{}]}
+    // response standard object, format in json: {"code": 0, "data": ""}
+    SrsJsonObject* robj = NULL;
+    SrsAutoFree(SrsJsonObject, robj);
+
+    if (true) {
+        SrsJsonAny* jr = NULL;
+        if ((jr = SrsJsonAny::loads(res)) == NULL) {
+            return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "load json from %s", res.c_str());
+        }
+
+        if (!jr->is_object()) {
+            srs_freep(jr);
+            return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "response %s", res.c_str());
+        }
+
+        robj = jr->to_object();
+    }
+
+    SrsJsonAny* prop = NULL;
+    if ((prop = robj->ensure_property_object("data")) == NULL) {
+        return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "parse data %s", res.c_str());
+    }
+
+    SrsJsonObject* p = prop->to_object();
+    if ((prop = p->ensure_property_array("forwards")) == NULL) {
+        return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "parse forwards %s", res.c_str());
+    }
+
+    SrsJsonArray* forwards = prop->to_array();
+    for (int i = 0; i < forwards->count(); i++) {
+        prop = forwards->at(i);
+        SrsJsonObject* forward = prop->to_object();
+        if ((prop = forward->ensure_property_string("url")) != NULL) {
+            rtmp_urls.push_back(prop->to_str());
+        }
+    }
+
     srs_trace("http: on_forward_backend ok, client_id=%s, url=%s, request=%s, response=%s",
         cid.c_str(), url.c_str(), data.c_str(), res.c_str());
 
