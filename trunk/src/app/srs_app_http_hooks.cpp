@@ -482,6 +482,30 @@ srs_error_t SrsHttpHooks::discover_co_workers(string url, string& host, int& por
     return err;
 }
 
+// Request:
+//      POST /api/v1/forward
+//      {
+//          "action": "on_forward",
+//          "server_id": "vid-k21d7y2",
+//          "client_id": "9o7g1330",
+//          "ip": "127.0.0.1",
+//          "vhost": "__defaultVhost__",
+//          "app": "live",
+//          "tcUrl": "rtmp://127.0.0.1:1935/live",
+//          "stream": "livestream",
+//          "param": "?forward=rtmp://ossrs.net/live/livestream"
+//      }
+// Response:
+//      {
+//          "code": 0,
+//          "data": {
+//              "forwards":[{
+//                  "url": "rtmp://ossrs.net:1935/live/livestream?auth_token=xxx"
+//               },{
+//                  "url": "rtmp://aliyuncdn.com:1935/live/livestream?auth_token=xxx"
+//               }]
+//          }
+//      }
 srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, std::vector<std::string>& rtmp_urls)
 {
     srs_error_t err = srs_success;
@@ -493,8 +517,8 @@ srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, std::v
     SrsJsonObject* obj = SrsJsonAny::object();
     SrsAutoFree(SrsJsonObject, obj);
 
-    obj->set("server_id", SrsJsonAny::str(stat->server_id().c_str()));
     obj->set("action", SrsJsonAny::str("on_forward"));
+    obj->set("server_id", SrsJsonAny::str(stat->server_id().c_str()));
     obj->set("client_id", SrsJsonAny::str(cid.c_str()));
     obj->set("ip", SrsJsonAny::str(req->ip.c_str()));
     obj->set("vhost", SrsJsonAny::str(req->vhost.c_str()));
@@ -507,34 +531,28 @@ srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, std::v
     std::string res;
     int status_code;
 
-    srs_trace("http: on_forward_backend: data=%s", data.c_str());
-
     SrsHttpClient http;
     if ((err = do_post(&http, url, data, status_code, res)) != srs_success) {
         return srs_error_wrap(err, "http: on_forward_backend failed, client_id=%s, url=%s, request=%s, response=%s, code=%d",
             cid.c_str(), url.c_str(), data.c_str(), res.c_str(), status_code);
     }
 
-    // response standard object, format in json: {"code": 0, "data": ""}
-    SrsJsonObject* robj = NULL;
-    SrsAutoFree(SrsJsonObject, robj);
+    // parse string res to json.
+    SrsJsonAny* info = SrsJsonAny::loads(res);
+    if (!info) {
+        return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "load json from %s", res.c_str());
+    }
+    SrsAutoFree(SrsJsonAny, info);
 
-    if (true) {
-        SrsJsonAny* jr = NULL;
-        if ((jr = SrsJsonAny::loads(res)) == NULL) {
-            return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "load json from %s", res.c_str());
-        }
-
-        if (!jr->is_object()) {
-            srs_freep(jr);
-            return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "response %s", res.c_str());
-        }
-
-        robj = jr->to_object();
+    // response error code in string.
+    if (!info->is_object()) {
+        return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "response %s", res.c_str());
     }
 
     SrsJsonAny* prop = NULL;
-    if ((prop = robj->ensure_property_object("data")) == NULL) {
+    // response standard object, format in json: {}
+    SrsJsonObject* res_info = info->to_object();
+    if ((prop = res_info->ensure_property_object("data")) == NULL) {
         return srs_error_new(ERROR_SYSTEM_FORWARD_LOOP, "parse data %s", res.c_str());
     }
 

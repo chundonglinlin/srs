@@ -1478,13 +1478,13 @@ srs_error_t SrsOriginHub::create_forwarders()
 
     SrsConfDirective* conf = _srs_config->get_forward_backend(req->vhost);
     if (conf) {
-        int length = conf->args.size();
-        for (int i = 0; i < length; i++) {
-            std::string forward_backend = conf->args.at(i);
+        int count = conf->args.size();
+        for (int i = 0; i < count; i++) {
+            std::string backend_url = conf->args.at(i);
 
             // create forward by backend
             std::vector<std::string> urls;
-            if ((err = SrsHttpHooks::on_forward_backend(forward_backend, req, urls)) != srs_success) {
+            if ((err = SrsHttpHooks::on_forward_backend(backend_url, req, urls)) != srs_success) {
                 // ignore
                 srs_trace("get backend failed, %s", srs_error_desc(err).c_str());
                 continue;
@@ -1492,7 +1492,7 @@ srs_error_t SrsOriginHub::create_forwarders()
 
             std::vector<std::string>::iterator it;
             for (it = urls.begin(); it != urls.end(); ++it) {
-                string url = *it;
+                std::string url = *it;
 
                 // create forwarder by url
                 SrsRequest* freq = new SrsRequest();
@@ -1502,12 +1502,11 @@ srs_error_t SrsOriginHub::create_forwarders()
                 SrsForwarder* forwarder = new SrsForwarder(this);
                 forwarders.push_back(forwarder);
 
-                std::stringstream ss;
-                ss << freq->host << ":" << freq->port;
-                std::string forward_server = ss.str();
+                std::stringstream forward_server;
+                forward_server << freq->host << ":" << freq->port;
 
                 // initialize the forwarder with request.
-                if ((err = forwarder->initialize(freq, forward_server)) != srs_success) {
+                if ((err = forwarder->initialize(freq, forward_server.str())) != srs_success) {
                     return srs_error_wrap(err, "init forwarder");
                 }
 
@@ -1515,7 +1514,7 @@ srs_error_t SrsOriginHub::create_forwarders()
 
                 if ((err = forwarder->on_publish()) != srs_success) {
                     return srs_error_wrap(err, "start backend forwarder failed, vhost=%s, app=%s, stream=%s, forward-to=%s",
-                        req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), forward_server.c_str());
+                        req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), forward_server.str().c_str());
                 }
             }
         }
