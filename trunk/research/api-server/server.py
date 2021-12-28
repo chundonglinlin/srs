@@ -910,8 +910,10 @@ class RESTForward(object):
                 destinations.append({
                     "url": result[1],
                 })
+            elif len(new_req_param) > 0:
+                new_req_param = new_req_param + "&" + param
             else:
-                new_req_param = "%s&%s"%(new_req_param, param)
+                new_req_param = param
 
         # secne: dynamic config
         for forward in self.__forwards:
@@ -936,7 +938,12 @@ class RESTForward(object):
             if url.find("rtmp://") == -1:
                 # format: xxx:xxx
                 # maybe you should use destination config
-                url = "rtmp://%s/%s?vhost=%s%s/%s"%(url, req['app'], req['vhost'], new_req_param, req['stream'])
+                url = "rtmp://%s/%s"%(url, req['app'])
+                if len(req['vhost']) > 0 and req['vhost'] != "__defaultVhost__" and url.find(req['vhost']) == -1:
+                    url = url + "?vhost=" + req['vhost']
+                url = url + "/" + req['stream']
+                if len(new_req_param) > 0:
+                    url = url + "?" + new_req_param
 
             # append
             forwards.append({
@@ -951,7 +958,12 @@ class RESTForward(object):
             if url.find("rtmp://") == -1:
                 # format: xxx:xxx
                 # maybe you should use destination config
-                url = "rtmp://%s/%s?vhost=%s%s/%s"%(url, req['app'], req['vhost'], new_req_param, req['stream'])
+                url = "rtmp://%s/%s"%(url, req['app'])
+                if len(req['vhost']) > 0 and req['vhost'] != "__defaultVhost__" and url.find(req['vhost']) == -1:
+                    url = url + "?vhost=" + req['vhost']
+                url = url + "/" + req['stream']
+                if len(new_req_param) > 0:
+                    url = url + "?" + new_req_param
 
             # append
             forwards.append({
