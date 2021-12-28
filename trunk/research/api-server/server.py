@@ -824,7 +824,13 @@ class RESTForward(object):
         self.__forwards.append({
             "app":"live",
             "stream":"livestream",
-            "url":"pu.jdcloud.com",
+            "url":"pu2.jdcloud.com",
+        })
+
+        self.__forwards.append({
+            "app":"live",
+            "stream":"livestream",
+            "url":"rtmp://pu3.jdcloud.com/test/teststream?auth_token=123456",
         })
 
     def GET(self):
@@ -889,6 +895,23 @@ class RESTForward(object):
 
         # dynamic create forward config
         forwards = []
+        destinations = []
+
+        # handle param: ?forward=xxxxx&auth_token=xxxxx
+        # 1.delete ?
+        req_param = req["param"].replace('?', '', 1)
+
+        # 2.delete 'forward=xxxxx'
+        new_req_param = ""
+        params = req_param.split("&")
+        for param in params:
+            result = param.split("=")
+            if result[0].find("forward") != -1:
+                destinations.append({
+                    "url": result[1],
+                })
+            else:
+                new_req_param = "%s&%s"%(new_req_param, param)
 
         # secne: dynamic config
         for forward in self.__forwards:
@@ -911,8 +934,9 @@ class RESTForward(object):
             # url maybe spell full rtmp address
             url = forward["url"]
             if url.find("rtmp://") == -1:
-                # maybe you should use destination config.
-                url = "rtmp://%s/%s?vhost=%s&%s/%s"%(url, req['app'], req['vhost'], req["param"], req['stream'])
+                # format: xxx:xxx
+                # maybe you should use destination config
+                url = "rtmp://%s/%s?vhost=%s%s/%s"%(url, req['app'], req['vhost'], new_req_param, req['stream'])
 
             # append
             forwards.append({
@@ -922,20 +946,17 @@ class RESTForward(object):
         # secne: parse client params, like:
         # format1: rtmp://srs-server/live/stream?forward=aliyuncdn.com:1936&token=xxxxxx
         # format2: rtmp://srs-server/live/stream?forward=rtmp://cdn.com/myapp/mystream?XXXXXX
-        if req["param"] is not None:
-            params = req["param"].split("&")
-            for param in params:
-                result = param.split("=")
-                if result[0].find("forward") != -1:
-                    url = result[1]
-                    if url.find("rtmp://") == -1:
-                        # maybe you should use destination config.
-                        url = "rtmp://%s/%s?vhost=%s&%s/%s"%(url, req['app'], req['vhost'], req["param"], req['stream'])
+        for destination in destinations:
+            url = destination["url"]
+            if url.find("rtmp://") == -1:
+                # format: xxx:xxx
+                # maybe you should use destination config
+                url = "rtmp://%s/%s?vhost=%s%s/%s"%(url, req['app'], req['vhost'], new_req_param, req['stream'])
 
-                    # append
-                    forwards.append({
-                        "url": url,
-                    })
+            # append
+            forwards.append({
+                "url": url,
+            })
 
         return json.dumps({"code": int(code), "data": {"forwards": forwards}})
 

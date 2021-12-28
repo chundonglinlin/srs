@@ -1512,6 +1512,7 @@ srs_error_t SrsOriginHub::create_forwarders()
                 }
 
                 forwarder->set_queue_size(queue_size);
+
                 if ((err = forwarder->on_publish()) != srs_success) {
                     return srs_error_wrap(err, "start backend forwarder failed, vhost=%s, app=%s, stream=%s, forward-to=%s",
                         req->vhost.c_str(), req->app.c_str(), req->stream.c_str(), forward_server.c_str());
@@ -1532,7 +1533,6 @@ srs_error_t SrsOriginHub::create_forwarders()
             return srs_error_wrap(err, "init forwarder");
         }
 
-        srs_utime_t queue_size = _srs_config->get_queue_length(req->vhost);
         forwarder->set_queue_size(queue_size);
         
         if ((err = forwarder->on_publish()) != srs_success) {

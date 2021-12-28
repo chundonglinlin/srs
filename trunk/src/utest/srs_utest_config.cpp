@@ -2919,9 +2919,14 @@ VOID TEST(ConfigMainTest, CheckVhostConfig2)
 
     if (true) {
         MockSrsConfig conf;
-        HELPER_ASSERT_SUCCESS(conf.parse(_MIN_OK_CONF "vhost ossrs.net{forward {destination xxx;backend xxx;}}"));
-        EXPECT_TRUE(conf.get_forwards("ossrs.net") != NULL);
+        HELPER_ASSERT_SUCCESS(conf.parse(_MIN_OK_CONF "vhost ossrs.net{forward {backend xxx;}}"));
         EXPECT_TRUE(conf.get_forward_backend("ossrs.net") != NULL);
+    }
+
+    if (true) {
+        MockSrsConfig conf;
+        HELPER_ASSERT_SUCCESS(conf.parse(_MIN_OK_CONF "vhost ossrs.net{forward {destination xxx;}}"));
+        EXPECT_TRUE(conf.get_forwards("ossrs.net") != NULL);
     }
 
     if (true) {
@@ -3117,6 +3122,7 @@ VOID TEST(ConfigMainTest, CheckVhostConfig3)
         EXPECT_EQ(0, (int)conf.get_vhost_coworkers("ossrs.net").size());
         EXPECT_FALSE(conf.get_security_enabled("ossrs.net"));
         EXPECT_TRUE(conf.get_security_rules("ossrs.net") == NULL);
+        EXPECT_TRUE(conf.get_forward_backend("ossrs.net") == NULL);
     }
 
     if (true) {
