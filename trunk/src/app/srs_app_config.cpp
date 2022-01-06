@@ -21,6 +21,8 @@
 #include <sys/utsname.h>
 #endif
 
+#include <dirent.h>
+
 #include <vector>
 #include <algorithm>
 using namespace std;
@@ -57,6 +59,9 @@ const char* _srs_version = "XCORE-" RTMP_SIG_SRS_SERVER;
 
 // '\r'
 #define SRS_CR (char)SRS_CONSTS_CR
+
+std::vector<std::string> SrsConfDirective::confFiles;
+char SrsConfDirective::mainfilefulldir[256];
 
 /**
  * dumps the ingest/transcode-engine in @param dir to amf0 object @param engine.
@@ -844,6 +849,8 @@ bool SrsConfDirective::is_stream_caster()
 
 srs_error_t SrsConfDirective::parse(SrsConfigBuffer* buffer)
 {
+    //reset the vector
+    confFiles.clear();
     return parse_conf(buffer, parse_file);
 }
 
@@ -971,14 +978,14 @@ SrsJsonAny* SrsConfDirective::dumps_arg0_to_boolean()
 // LCOV_EXCL_STOP
 
 // see: ngx_conf_parse
-srs_error_t SrsConfDirective::parse_conf(SrsConfigBuffer* buffer, SrsDirectiveType type)
+srs_error_t SrsConfDirective::parse_conf(SrsConfigBuffer* buffer, SrsDirectiveType type, const char* filename)
 {
     srs_error_t err = srs_success;
     
     while (true) {
         std::vector<string> args;
         int line_start = 0;
-        err = read_token(buffer, args, line_start);
+        err = read_token(buffer, args, line_start, filename);
         
         /**
          * ret maybe:
@@ -1029,13 +1036,169 @@ srs_error_t SrsConfDirective::parse_conf(SrsConfigBuffer* buffer, SrsDirectiveTy
             }
         }
         srs_freep(err);
+
+        // read directives like "include conf/a.log"
+        // read directives like "include conf/*.conf", "include conf/domain.*"
+        if (directive->args.size() >=1 &&  directive->name == "include"    && directive->args[0].find("*") == std::string::npos) {
+            directives.pop_back();
+
+            const char* filenametemp = directive->args[0].c_str();
+            srs_freep(directive);
+            char filenamefullpath[512];
+            memcpy(filenamefullpath, SrsConfDirective::mainfilefulldir, strlen(SrsConfDirective::mainfilefulldir));
+            memcpy(filenamefullpath+strlen(SrsConfDirective::mainfilefulldir), filenametemp, strlen(filenametemp));
+            filenamefullpath[strlen(SrsConfDirective::mainfilefulldir)+strlen(filenametemp)] = '\0';
+            srs_trace("file %s, line %d: find a include(include %s)", filename, line_start, filenamefullpath);
+
+            //1. if suffix is wrong, exit
+            char filesuffix[6];
+            int filenamelen = strlen(filenametemp);
+            memset(filesuffix, 0, 6);
+            memcpy(filesuffix, filenametemp+(filenamelen>5?filenamelen-5:0), filenamelen>5?5:filenamelen);
+            if (strstr(filesuffix, ".conf") == NULL) {
+                return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "conf file %s. name is wrong. server will break down.",  filenametemp);
+            } else {
+              srs_trace("conf file %s. name is right.",  filenametemp);
+            }
+
+            //2. if conffilename a folder, continue to next
+            struct stat buf;
+            int ret = lstat(filenamefullpath, &buf);
+            if (ret != 0) {
+                return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "get file/folder status faild: %s, error:%d. server will exit.", filenametemp, ret);
+            } else if (S_ISDIR(buf.st_mode)) {
+                srs_warn("find a folder: %s. contiune to next file.", filenametemp);
+                continue;
+            }
+
+            //3. if already has include the file, exit
+            if (std::find(confFiles.begin(), confFiles.end(), filenamefullpath) != confFiles.end()) {
+                //if has include, show error, return
+                return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s, line %d: find a loop include(include %s). server will exit.",
+                    filename, conf_line, filenamefullpath);
+            } else {
+                //if hasn't include, push the file in , and deal this file
+                confFiles.push_back(filenamefullpath);
+            }
+
+            //4. open file, and parse
+            SrsConfigBuffer buffer;
+            if ((err = buffer.fullfill(filenamefullpath)) != ERROR_SUCCESS) {
+                return srs_error_wrap(err, "parse dir");
+            } else if ((err = parse_conf(&buffer, parse_file, filenamefullpath)) != srs_success) {
+                return srs_error_wrap(err, "parse dir");
+            }
+
+        } else if (directive->args.size() >=1 &&  directive->name == "include"
+                && directive->args[0].find("*") != std::string::npos) {
+            directives.pop_back();
+
+            //get dir name full path. such as /export/servers/srs/conf/domains/*.conf
+            const char* dirnametemp = directive->args[0].c_str();
+            srs_freep(directive);
+            char dirnamefullpath[512];
+            memcpy(dirnamefullpath, SrsConfDirective::mainfilefulldir, strlen(SrsConfDirective::mainfilefulldir));
+            memcpy(dirnamefullpath+strlen(SrsConfDirective::mainfilefulldir), dirnametemp, strlen(dirnametemp));
+            dirnamefullpath[strlen(SrsConfDirective::mainfilefulldir)+strlen(dirnametemp)] = '\0';
+            srs_trace("file %s, line %d: find a include(include %s)", filename, line_start, dirnamefullpath);
+
+            //get  dir_name, and  dir_suffix. such as /export/servers/srs/, *.conf
+            int DirNameLen = strlen(dirnamefullpath);
+            while (DirNameLen-- > 0) {
+                if (dirnamefullpath[DirNameLen] == '/') {
+                    break;
+                }
+            }
+            memset(dir_name, 0, 1024);
+            memcpy(dir_name, dirnamefullpath, DirNameLen);
+            memset(dir_suffix, 0, 16);
+            memcpy(dir_suffix, dirnamefullpath+DirNameLen+3, strlen(dirnamefullpath)-DirNameLen);
+            //if not  ./conf/vhost/*.conf, but  ./conf/vhost/*.donf, return
+            if (strstr(".conf", dir_suffix) == NULL) {
+                return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s, line %d: find a include(include %s), wrong suffix. server will exit.",
+                    filename, line_start, dirnamefullpath);
+            }
+
+            //open the dir, and travel
+            struct stat s;
+            struct dirent * filenamedirent;    // return value for readdir()
+            int nConffileIndex = 0;
+            lstat( dir_name , &s );
+            if ( ! S_ISDIR( s.st_mode ) ) {
+               return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "(%s) is not a valid directory! server will exit.", dir_name);
+            }
+
+            DIR *dir = opendir( dir_name );
+            if ( NULL == dir ) {
+                closedir(dir);
+                return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "Can not open dir. server will exit.", dir_name);
+            }
+            srs_trace("Successfully opened the dir(%s)!", dir_name);
+            while ( ( filenamedirent = readdir(dir) ) != NULL ) {
+                // get rid of "." and ".."
+                if( strcmp( filenamedirent->d_name , "." ) == 0 ||
+                    strcmp( filenamedirent->d_name , "..") == 0) {
+                    continue;
+                }
+
+                //0. get full name
+                memset(conffilename, 0, 1024);
+                memcpy(conffilename, dir_name, DirNameLen);
+                conffilename[DirNameLen] = '/';
+                memcpy(conffilename+DirNameLen+1, filenamedirent->d_name, strlen(filenamedirent->d_name));
+
+                //1. check file/folder's suffix is wrong, exit
+                char filesuffix[6];
+                int filenamelen = strlen(filenamedirent->d_name);
+                memset(filesuffix, 0, 6);
+                memcpy(filesuffix, filenamedirent->d_name+(filenamelen>5?filenamelen-5:0), filenamelen>5?5:filenamelen);
+                if (strstr(filesuffix, ".conf") == NULL) {
+                    srs_warn("Conf File: file [%s] ignored!", conffilename);
+                    continue;
+                }
+
+                //2. if conffilename is a folder, continue to next
+                struct stat buf;
+                int ret = lstat(conffilename, &buf);
+                if (ret != 0) {
+                    closedir(dir);
+                    return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "get file/folder status faild: %s, error:%d. server will exit.",
+                        filenamedirent->d_name, ret);
+                } else if (S_ISDIR(buf.st_mode)) {
+                    srs_warn("find a folder: %s. continue to next file.", filenamedirent->d_name);
+                    continue;
+                }
+
+                //3. if has already include the file, exit
+                if (std::find(confFiles.begin(), confFiles.end(), conffilename) != confFiles.end()) {
+                    closedir(dir);
+                    return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s, line %d: find a loop include(include %s). server will exit.",
+                        filename, conf_line, conffilename);
+                } else{
+                    //if hasn't include, push the file in , and deal this file
+                    confFiles.push_back(conffilename);
+                    srs_trace("File Push Back[%d]: [%s].", ++nConffileIndex, conffilename);
+                }
+
+                //4. open file, and parse
+                SrsConfigBuffer buffer;
+                if ((err = buffer.fullfill(conffilename)) != ERROR_SUCCESS) {
+                    closedir(dir);
+                    return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "");
+                } else if ((err = parse_conf(&buffer, parse_file, conffilename)) != srs_success) {
+                    closedir(dir);
+                    return srs_error_wrap(err, "parse dir");
+                }
+            }
+            closedir(dir);
+        }
     }
     
     return err;
 }
 
 // see: ngx_conf_read_token
-srs_error_t SrsConfDirective::read_token(SrsConfigBuffer* buffer, vector<string>& args, int& line_start)
+srs_error_t SrsConfDirective::read_token(SrsConfigBuffer* buffer, vector<string>& args, int& line_start, const char* filename)
 {
     srs_error_t err = srs_success;
     
@@ -1053,10 +1216,10 @@ srs_error_t SrsConfDirective::read_token(SrsConfigBuffer* buffer, vector<string>
         if (buffer->empty()) {
             if (!args.empty() || !last_space) {
                 return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID,
-                    "line %d: unexpected end of file, expecting ; or \"}\"",
-                    buffer->line);
+                    "file %s line %d: unexpected end of file, expecting ; or \"}\"",
+                    filename, buffer->line);
             }
-            srs_trace("config parse complete");
+            srs_trace("file %s config parse complete", filename);
             
             return srs_error_new(ERROR_SYSTEM_CONFIG_EOF, "EOF");
         }
@@ -1084,7 +1247,7 @@ srs_error_t SrsConfDirective::read_token(SrsConfigBuffer* buffer, vector<string>
             if (ch == '{') {
                 return srs_error_new(ERROR_SYSTEM_CONFIG_BLOCK_START, "block");
             }
-            return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "line %d: unexpected '%c'", buffer->line, ch);
+            return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s line %d: unexpected '%c'", filename, buffer->line, ch);
         }
         
         // last charecter is space.
@@ -1096,17 +1259,17 @@ srs_error_t SrsConfDirective::read_token(SrsConfigBuffer* buffer, vector<string>
             switch (ch) {
                 case ';':
                     if (args.size() == 0) {
-                        return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "line %d: unexpected ';'", buffer->line);
+                        return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s line %d: unexpected ';'", filename, buffer->line);
                     }
                     return srs_error_new(ERROR_SYSTEM_CONFIG_DIRECTIVE, "dir");
                 case '{':
                     if (args.size() == 0) {
-                        return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "line %d: unexpected '{'", buffer->line);
+                        return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s line %d: unexpected '{'", filename, buffer->line);
                     }
                     return srs_error_new(ERROR_SYSTEM_CONFIG_BLOCK_START, "block");
                 case '}':
                     if (args.size() != 0) {
-                        return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "line %d: unexpected '}'", buffer->line);
+                        return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "file %s line %d: unexpected '}'", filename, buffer->line);
                     }
                     return srs_error_new(ERROR_SYSTEM_CONFIG_BLOCK_END, "block");
                 case '#':

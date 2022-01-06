@@ -145,6 +145,21 @@ extern SrsConfig* _srs_config;
 // @remark, don't allow empty name, for example: ";" or "{dir0 arg0;}
 class SrsConfDirective
 {
+private:
+    // used to jude loop include, such as, in aa.conf(include bb.conf;), in bb.conf(include aa.conf;)
+    static std::vector<std::string> confFiles;
+
+    // used to save the directory name, directory suffix
+    char dir_name[1024];
+    char dir_suffix[16];
+    char conffilename[1024];
+
+    //  get configure foder full path
+	//  if    command lie is         ./bin/srs -c ./conf/srs.conf
+	//        exe  full path          /export/srs/bin/srs
+	//  then  cmdstarname is         ./bin/srs
+	//        mainfilefulldir is      /export/srs/bin/conf/
+    static char mainfilefulldir[256];
 public:
     // The line of config file in which the directive from
     int conf_line;
@@ -234,13 +249,13 @@ private:
     // 1. read a token(directive args and a ret flag),
     // 2. initialize the directive by args, args[0] is name, args[1-N] is args of directive,
     // 3. if ret flag indicates there are child-directives, read_conf(directive, block) recursively.
-    virtual srs_error_t parse_conf(srs_internal::SrsConfigBuffer* buffer, SrsDirectiveType type);
+    virtual srs_error_t parse_conf(srs_internal::SrsConfigBuffer* buffer, SrsDirectiveType type, const char* filename="root_conf");
     // Read a token from buffer.
     // A token, is the directive args and a flag indicates whether has child-directives.
     // @param args, the output directive args, the first is the directive name, left is the args.
     // @param line_start, the actual start line of directive.
     // @return, an error code indicates error or has child-directives.
-    virtual srs_error_t read_token(srs_internal::SrsConfigBuffer* buffer, std::vector<std::string>& args, int& line_start);
+    virtual srs_error_t read_token(srs_internal::SrsConfigBuffer* buffer, std::vector<std::string>& args, int& line_start, const char* filename=NULL);
 };
 
 // The config service provider.
