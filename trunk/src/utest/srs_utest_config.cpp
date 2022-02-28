@@ -1291,6 +1291,11 @@ VOID TEST(ConfigMainTest, CheckConf_vhost_dvr)
         MockSrsConfig conf;
         HELPER_ASSERT_FAILED(conf.parse(_MIN_OK_CONF "vhost v{dvr{time_jitters full;}}"));
     }
+
+    if (true) {
+        MockSrsConfig conf;
+        HELPER_ASSERT_FAILED(conf.parse(_MIN_OK_CONF "vhost v{dvr{backend http://127.0.0.1/api/v1/dynamic_dvr;}}"));
+    }
 }
 
 VOID TEST(ConfigMainTest, CheckConf_vhost_ingest)

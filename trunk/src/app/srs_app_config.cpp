@@ -2726,7 +2726,7 @@ srs_error_t SrsConfig::check_normal_config()
                 for (int j = 0; j < (int)conf->directives.size(); j++) {
                     string m = conf->at(j)->name;
                     if (m != "enabled"  && m != "dvr_apply" && m != "dvr_path" && m != "dvr_plan"
-                        && m != "dvr_duration" && m != "dvr_wait_keyframe" && m != "time_jitter") {
+                        && m != "dvr_duration" && m != "dvr_wait_keyframe" && m != "time_jitter" && m != "backend") {
                         return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "illegal vhost.dvr.%s of %s", m.c_str(), vhost->arg0().c_str());
                     }
                 }
@@ -6527,6 +6527,21 @@ int SrsConfig::get_dvr_time_jitter(string vhost)
     }
     
     return srs_time_jitter_string2int(conf->arg0());
+}
+
+SrsConfDirective* SrsConfig::get_dvr_backend(string vhost)
+{
+    SrsConfDirective* conf = get_dvr(vhost);
+    if (!conf) {
+        return NULL;
+    }
+
+    conf = conf->get("backend");
+    if (!conf || conf->arg0().empty()) {
+        return NULL;
+    }
+
+    return conf;
 }
 
 bool SrsConfig::get_http_api_enabled()

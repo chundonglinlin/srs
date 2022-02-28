@@ -972,6 +972,8 @@ public:
     virtual bool get_dvr_wait_keyframe(std::string vhost);
     // Get the time_jitter algorithm for dvr.
     virtual int get_dvr_time_jitter(std::string vhost);
+    // Get the backend of dvr to dynamic recording.
+    SrsConfDirective* get_dvr_backend(std::string vhost);
 // http api section
 private:
     // Whether http api enabled
