@@ -84,6 +84,10 @@ public:
     // @param url the api server url, to valid the client.
     //         ignore if empty.
     static srs_error_t on_forward_backend(std::string url, SrsRequest* req, std::vector<std::string>& rtmp_urls);
+    // The on_dvr_backend hook, when publish stream start to dvr
+    // @param url the api server url, to valid the client.
+    //         ignore if empty.
+    static srs_error_t on_dvr_backend(std::string url, SrsRequest* req);
 private:
     static srs_error_t do_post(SrsHttpClient* hc, std::string url, std::string req, int& code, std::string& res);
 };

@@ -552,6 +552,101 @@ srs_error_t SrsHttpHooks::on_forward_backend(string url, SrsRequest* req, std::v
     return err;
 }
 
+srs_error_t SrsHttpHooks::on_dvr_backend(string url, SrsRequest* req)
+{
+    srs_error_t err = srs_success;
+
+    SrsContextId cid = _srs_context->get_id();
+
+    SrsStatistic* stat = SrsStatistic::instance();
+
+    SrsJsonObject* obj = SrsJsonAny::object();
+    SrsAutoFree(SrsJsonObject, obj);
+
+    obj->set("action", SrsJsonAny::str("dynamic_dvr"));
+    obj->set("server_id", SrsJsonAny::str(stat->server_id().c_str()));
+    obj->set("client_id", SrsJsonAny::str(cid.c_str()));
+    obj->set("ip", SrsJsonAny::str(req->ip.c_str()));
+    obj->set("vhost", SrsJsonAny::str(req->vhost.c_str()));
+    obj->set("app", SrsJsonAny::str(req->app.c_str()));
+    obj->set("tcUrl", SrsJsonAny::str(req->tcUrl.c_str()));
+    obj->set("stream", SrsJsonAny::str(req->stream.c_str()));
+    obj->set("param", SrsJsonAny::str(req->param.c_str()));
+
+    std::string data = obj->dumps();
+    std::string res;
+    int status_code;
+
+    SrsHttpClient http;
+    if ((err = do_post(&http, url, data, status_code, res)) != srs_success) {
+        return srs_error_wrap(err, "http: on_forward_backend failed, client_id=%s, url=%s, request=%s, response=%s, code=%d",
+            cid.c_str(), url.c_str(), data.c_str(), res.c_str(), status_code);
+    }
+
+    /*
+    #               "apply": "all", (all|[app]/[stream])
+    #               "plan": "segment", (session|segment)
+    #               "path": "./objs/nginx/html/[app]/[stream].[timestamp].flv",
+    #               "duration": 5000,
+    #               "wait_keyframe": "off", (off|on)
+    #               "time_jitter": "full" (full|zero|off)
+    */
+    // parse string res to json.
+    SrsJsonAny* info = SrsJsonAny::loads(res);
+    if (!info) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "load json from %s", res.c_str());
+    }
+    SrsAutoFree(SrsJsonAny, info);
+
+    // response error code in string.
+    if (!info->is_object()) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "response %s", res.c_str());
+    }
+
+    SrsJsonAny* prop = NULL;
+    // response standard object, format in json: {}
+    SrsJsonObject* res_info = info->to_object();
+    if ((prop = res_info->ensure_property_object("data")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr data %s", res.c_str());
+    }
+
+    SrsJsonObject* p = prop->to_object();
+    if ((prop = p->ensure_property_object("apply")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr apply %s", res.c_str());
+    }
+    // apply
+
+    if ((prop = p->ensure_property_object("plan")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr plan %s", res.c_str());
+    }
+    // plan
+
+    if ((prop = p->ensure_property_object("path")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr path %s", res.c_str());
+    }
+    // path
+
+    if ((prop = p->ensure_property_object("duration")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr duration %s", res.c_str());
+    }
+    // duration
+
+    if ((prop = p->ensure_property_object("wait_keyframe")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr wait_keyframe %s", res.c_str());
+    }
+    // wait_keyframe
+
+    if ((prop = p->ensure_property_object("time_jitter")) == NULL) {
+        return srs_error_new(ERROR_HTTP_DVR_NO_TAEGET, "parse dvr time_jitter %s", res.c_str());
+    }
+    // time_jitter
+
+    srs_trace("http: on_dvr_backend ok, client_id=%s, url=%s, request=%s, response=%s",
+        cid.c_str(), url.c_str(), data.c_str(), res.c_str());
+
+    return err;
+}
+
 srs_error_t SrsHttpHooks::do_post(SrsHttpClient* hc, std::string url, std::string req, int& code, string& res)
 {
     srs_error_t err = srs_success;
