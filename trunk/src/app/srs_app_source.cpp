@@ -965,9 +965,21 @@ srs_error_t SrsOriginHub::on_audio(SrsSharedPtrMessage* shared_audio)
     }
     
     if ((err = hls->on_audio(msg, format)) != srs_success) {
+        std::string hls_error_strategy = "";
+
+        // hook hls backend
+        std::string hls_backend = _srs_config->get_hls_backend(req_->vhost);
+        if (!hls_backend.empty()) {
+            // get strategy on hls backend
+            if ((err = SrsHttpHooks::on_hls_backend(hls_backend, req_, hls_error_strategy)) != srs_success) {
+                return srs_error_wrap(err, "get hls backend failed, backend=%s", hls_backend.c_str());
+            }
+        } else {
+            hls_error_strategy = _srs_config->get_hls_on_error(req_->vhost);
+        }
+
         // apply the error strategy for hls.
         // @see https://github.com/ossrs/srs/issues/264
-        std::string hls_error_strategy = _srs_config->get_hls_on_error(req_->vhost);
         if (srs_config_hls_is_on_error_ignore(hls_error_strategy)) {
             srs_warn("hls: ignore audio error %s", srs_error_desc(err).c_str());
             hls->on_unpublish();

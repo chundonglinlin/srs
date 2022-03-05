@@ -84,6 +84,10 @@ public:
     // @param url the api server url, to valid the client.
     //         ignore if empty.
     static srs_error_t on_forward_backend(std::string url, SrsRequest* req, std::vector<std::string>& rtmp_urls);
+    // The on_hls_backend hook, when hls occur error
+    // @param url the api server url, to valid the client.
+    //         ignore if empty.
+    static srs_error_t on_hls_backend(std::string url, SrsRequest* req, std::string& strategy);
 private:
     static srs_error_t do_post(SrsHttpClient* hc, std::string url, std::string req, int& code, std::string& res);
 };

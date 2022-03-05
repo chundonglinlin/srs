@@ -936,6 +936,7 @@ public:
     virtual int get_vhost_hls_nb_notify(std::string vhost);
     // Whether turn the FLV timestamp to TS DTS.
     virtual bool get_vhost_hls_dts_directly(std::string vhost);
+    virtual std::string get_hls_backend(std::string vhost);
 // hds section
 private:
     // Get the hds directive of vhost.
