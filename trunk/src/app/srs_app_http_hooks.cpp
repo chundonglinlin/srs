@@ -563,7 +563,7 @@ srs_error_t SrsHttpHooks::on_hls_backend(string url, SrsRequest* req, string& st
     SrsJsonObject* obj = SrsJsonAny::object();
     SrsAutoFree(SrsJsonObject, obj);
 
-    obj->set("action", SrsJsonAny::str("on_hls"));
+    obj->set("action", SrsJsonAny::str("on_hls_err"));
     obj->set("server_id", SrsJsonAny::str(stat->server_id().c_str()));
     obj->set("client_id", SrsJsonAny::str(cid.c_str()));
     obj->set("ip", SrsJsonAny::str(req->ip.c_str()));

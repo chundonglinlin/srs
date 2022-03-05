@@ -885,6 +885,83 @@ class RESTForward(object):
 
         return json.dumps({"code": int(code), "data": {"urls": forwards}})
 
+'''
+handle the hls requests: dynamic hls url.
+'''
+class RESTHlsError(object):
+    exposed = True
+
+    def __init__(self):
+        self.__hls_err = []
+
+    def GET(self):
+        enable_crossdomain()
+
+        hls_err = {}
+        return json.dumps(hls_err)
+
+    '''
+    for SRS hook: on_hls_err
+    on_hls:
+        when srs reap a ts file, call the hook,
+        the request in the POST data string is a object encode by json:
+              {
+                  "action": "on_hls_err",
+                  "server_id": "server_test",
+                  "client_id": 1985,
+                  "ip": "192.168.1.10",
+                  "vhost": "video.test.com",
+                  "app": "live",
+                  "tcUrl": "rtmp://video.test.com/live?key=d2fa801d08e3f90ed1e1670e6e52651a",
+                  "stream": "livestream",
+                  "param":"?token=xxx&salt=yyy"
+              }
+    if valid, the hook must return HTTP code 200(Stauts OK) and response
+    an int value specifies the error code(0 corresponding to success):
+          0
+    '''
+    def POST(self):
+        enable_crossdomain()
+
+        # return the error code in str
+        code = Error.success
+
+        req = cherrypy.request.body.read()
+        trace("post to hls, req=%s"%(req))
+        try:
+            json_req = json.loads(req)
+        except Exception, ex:
+            code = Error.system_parse_json
+            trace("parse the request to json failed, req=%s, ex=%s, code=%s"%(req, ex, code))
+            return json.dumps({"code": int(code), "data": None})
+
+        action = json_req["action"]
+        if action == "on_hls_err":
+            return self.__on_hls_err(json_req)
+        else:
+            trace("invalid request action: %s"%(json_req["action"]))
+            code = Error.request_invalid_action
+
+        return json.dumps({"code": int(code), "data": None})
+
+    def OPTIONS(self, *args, **kwargs):
+        enable_crossdomain()
+
+    def __on_hls_err(self, req):
+        code = Error.success
+
+        trace("srs %s: client id=%s, ip=%s, vhost=%s, app=%s, tcUrl=%s, stream=%s, param=%s"%(
+            req["action"], req["client_id"], req["ip"], req["vhost"], req["app"], req["tcUrl"], req["stream"], req["param"]
+        ))
+
+        '''
+        backend service config description:
+            handle hls error
+        '''
+        hls_error_strategy = "ignore"
+
+        return json.dumps({"code": int(code), "data": {"strategy": hls_error_strategy}})
+
 # HTTP RESTful path.
 class Root(object):
     exposed = True
@@ -927,6 +1004,7 @@ class V1(object):
         self.servers = RESTServers()
         self.snapshots = RESTSnapshots()
         self.forward = RESTForward()
+        self.hls_err = RESTHlsError()
     def GET(self):
         enable_crossdomain();
         return json.dumps({"code":Error.success, "urls":{
