@@ -331,7 +331,7 @@ The changelog for SRS.
 * <strong>v3.0, 2020-01-21, [3.0 alpha9(3.0.105)](https://github.com/ossrs/srs/releases/tag/v3.0-a9) released. 121577 lines.</strong>
 * v3.0, 2020-01-21, Fix [#1221](https://github.com/ossrs/srs/issues/1221), remove complex configure options. 3.0.104
 * v3.0, 2020-01-21, Fix [#1547](https://github.com/ossrs/srs/issues/1547), support crossbuild for ARM/MIPS.
-* v3.0, 2020-01-21, For [#1547](https://github.com/ossrs/srs/issues/1547), support setting cc/cxx/ar/ld/randlib tools. 3.0.103
+* v3.0, 2020-01-21, For [#1547](https://github.com/ossrs/srs/issues/1547), support setting cc/cxx/ar/ld/ranlib tools. 3.0.103
 * v3.0, 2020-01-19, For [#1580](https://github.com/ossrs/srs/issues/1580), fix cid range problem. 3.0.102
 * v3.0, 2020-01-19, For [#1070](https://github.com/ossrs/srs/issues/1070), define FLV CodecID for [AV1](https://github.com/ossrs/srs/issues/1070) and [opus](https://github.com/ossrs/srs/issues/307). 3.0.101
 * v3.0, 2020-01-16, For [#1575](https://github.com/ossrs/srs/issues/1575), correct RTMP redirect as tcUrl, add redirect2 as RTMP URL. 3.0.100

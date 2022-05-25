@@ -455,7 +455,7 @@ GCC = ${SRS_TOOL_CC}
 CXX = ${SRS_TOOL_CXX}
 AR = ${SRS_TOOL_AR}
 LINK = ${SRS_TOOL_LD}
-RANDLIB = ${SRS_TOOL_RANDLIB}
+RANLIB = ${SRS_TOOL_RANLIB}
 CXXFLAGS = ${CXXFLAGS}
 
 # install prefix.
@@ -538,12 +538,12 @@ clean_st:
 st:
 	(cd ${SRS_OBJS_DIR} && rm -f srs srs_utest)
 	(cd ${SRS_OBJS_DIR}/${SRS_PLATFORM}/st-srs && \$(MAKE) clean)
-	(cd ${SRS_OBJS_DIR}/${SRS_PLATFORM}/st-srs && env EXTRA_CFLAGS="${_ST_EXTRA_CFLAGS}" \$(MAKE) ${_ST_MAKE_ARGS} CC=\$(GCC) AR=\$(AR) LD=\$(LINK) RANDLIB=\$(RANDLIB))
+	(cd ${SRS_OBJS_DIR}/${SRS_PLATFORM}/st-srs && env EXTRA_CFLAGS="${_ST_EXTRA_CFLAGS}" \$(MAKE) ${_ST_MAKE_ARGS} CC=\$(GCC) AR=\$(AR) LD=\$(LINK) RANLIB=\$(RANLIB))
 	@echo "Please rebuild srs by: rm -f objs/srs && make"
 
 ffmpeg:
 	(cd ${SRS_OBJS_DIR} && rm -f srs srs_utest)
-	(cd ${SRS_OBJS}/${SRS_PLATFORM}/ffmpeg-4.2-fit && \$(MAKE) && \$(MAKE) install-libs)
+	(cd ${SRS_OBJS}/${SRS_PLATFORM}/ffmpeg-4.2-fit && echo "prepare make ffmpeg"  && \$(MAKE) && \$(MAKE) install-libs)
 	@echo "Please rebuild srs by: rm -f objs/srs && make"
 
 END

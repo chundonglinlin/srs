@@ -412,7 +412,7 @@ else
 fi
 # The final args to make st.
 _ST_MAKE_ARGS="${_ST_MAKE} STATIC_ONLY=${_ST_STATIC_ONLY}"
-_ST_MAKE_ARGS="${_ST_MAKE_ARGS} CC=${SRS_TOOL_CC} AR=${SRS_TOOL_AR} LD=${SRS_TOOL_LD} RANDLIB=${SRS_TOOL_RANDLIB}"
+_ST_MAKE_ARGS="${_ST_MAKE_ARGS} CC=${SRS_TOOL_CC} AR=${SRS_TOOL_AR} LD=${SRS_TOOL_LD} RANLIB=${SRS_TOOL_RANLIB}"
 # Patched ST from https://github.com/ossrs/state-threads/tree/srs
 if [[ -f ${SRS_OBJS}/${SRS_PLATFORM}/st-srs/${_ST_OBJ}/libst.a ]]; then
     echo "The state-threads is ok.";
@@ -587,7 +587,7 @@ if [[ $SRS_SSL == YES && $SRS_USE_SYS_SSL != YES ]]; then
         (
             rm -rf ${SRS_OBJS}/${SRS_PLATFORM}/${OPENSSL_CANDIDATE} && cd ${SRS_OBJS}/${SRS_PLATFORM} &&
             ${OPENSSL_UNZIP} && cd $OPENSSL_CANDIDATE && ${OPENSSL_CONFIG} --prefix=`pwd`/_release $OPENSSL_OPTIONS &&
-            make CC=${SRS_TOOL_CC} AR="${OPENSSL_AR}" LD=${SRS_TOOL_LD} RANDLIB=${SRS_TOOL_RANDLIB} ${SRS_JOBS} && make install_sw &&
+            make CC=${SRS_TOOL_CC} AR="${OPENSSL_AR}" LD=${SRS_TOOL_LD} RANLIB=${SRS_TOOL_RANLIB} ${SRS_JOBS} && make install_sw &&
             cd .. && rm -rf openssl && ln -sf $OPENSSL_CANDIDATE/_release openssl
         )
     fi

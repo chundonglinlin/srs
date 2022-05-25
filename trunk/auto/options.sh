@@ -93,7 +93,7 @@ SRS_TOOL_CC=gcc
 SRS_TOOL_CXX=g++
 SRS_TOOL_AR=ar
 SRS_TOOL_LD=ld
-SRS_TOOL_RANDLIB=randlib
+SRS_TOOL_RANLIB=ranlib
 SRS_EXTRA_FLAGS=
 #
 #####################################################################################
@@ -159,7 +159,7 @@ Toolchain options:          @see https://github.com/ossrs/srs/wiki/v4_CN_SrsLinu
   --cxx=<CXX>               Toolchain: Use c++ compiler CXX. Default: $SRS_TOOL_CXX
   --ar=<AR>                 Toolchain: Use archive tool AR. Default: $SRS_TOOL_CXX
   --ld=<LD>                 Toolchain: Use linker tool LD. Default: $SRS_TOOL_CXX
-  --randlib=<RANDLIB>       Toolchain: Use randlib tool RANDLIB. Default: $SRS_TOOL_CXX
+  --ranlib=<RANLIB>         Toolchain: Use ranlib tool RANLIB. Default: $SRS_TOOL_CXX
   --extra-flags=<EFLAGS>    Set EFLAGS as CFLAGS and CXXFLAGS. Also passed to ST as EXTRA_CFLAGS.
 
 Experts:
@@ -233,7 +233,7 @@ function parse_user_option() {
         --cxx)                          SRS_TOOL_CXX=${value}       ;;
         --ar)                           SRS_TOOL_AR=${value}        ;;
         --ld)                           SRS_TOOL_LD=${value}        ;;
-        --randlib)                      SRS_TOOL_RANDLIB=${value}   ;;
+        --ranlib)                       SRS_TOOL_RANLIB=${value}    ;;
         --extra-flags)                  SRS_EXTRA_FLAGS=${value}    ;;
         --build-tag)                    SRS_BUILD_TAG=${value}      ;;
 
@@ -419,7 +419,7 @@ function apply_auto_options() {
         SRS_TOOL_CXX=${SRS_CROSS_BUILD_PREFIX}g++
         SRS_TOOL_AR=${SRS_CROSS_BUILD_PREFIX}ar
         SRS_TOOL_LD=${SRS_CROSS_BUILD_PREFIX}ld
-        SRS_TOOL_RANDLIB=${SRS_CROSS_BUILD_PREFIX}randlib
+        SRS_TOOL_RANLIB=${SRS_CROSS_BUILD_PREFIX}ranlib
         if [[ $SRS_CROSS_BUILD_ARCH == "" ]]; then
             echo $SRS_TOOL_CC| grep arm >/dev/null 2>&1 && SRS_CROSS_BUILD_ARCH="arm"
             echo $SRS_TOOL_CC| grep aarch64 >/dev/null 2>&1 && SRS_CROSS_BUILD_ARCH="aarch64"
@@ -552,7 +552,7 @@ function regenerate_options() {
     if [[ $SRS_TOOL_CXX != '' ]]; then      SRS_AUTO_CONFIGURE="${SRS_AUTO_CONFIGURE} --cxx=$SRS_TOOL_CXX"; fi
     if [[ $SRS_TOOL_AR != '' ]]; then       SRS_AUTO_CONFIGURE="${SRS_AUTO_CONFIGURE} --ar=$SRS_TOOL_AR"; fi
     if [[ $SRS_TOOL_LD != '' ]]; then       SRS_AUTO_CONFIGURE="${SRS_AUTO_CONFIGURE} --ld=$SRS_TOOL_LD"; fi
-    if [[ $SRS_TOOL_RANDLIB != '' ]]; then  SRS_AUTO_CONFIGURE="${SRS_AUTO_CONFIGURE} --randlib=$SRS_TOOL_RANDLIB"; fi
+    if [[ $SRS_TOOL_RANLIB != '' ]]; then   SRS_AUTO_CONFIGURE="${SRS_AUTO_CONFIGURE} --ranlib=$SRS_TOOL_RANLIB"; fi
     echo "User config: $SRS_AUTO_USER_CONFIGURE"
     echo "Detail config: ${SRS_AUTO_CONFIGURE}"
 }
@@ -562,8 +562,8 @@ regenerate_options
 # check user options
 #####################################################################################
 function check_option_conflicts() {
-    if [[ $SRS_TOOL_CC == '' ||  $SRS_TOOL_CXX == '' ||  $SRS_TOOL_AR == '' ||  $SRS_TOOL_LD == '' ||  $SRS_TOOL_RANDLIB == '' ]]; then
-        echo "Error: No build toolchain, cc: $SRS_TOOL_CC, cxx: $SRS_TOOL_CXX, ar: $SRS_TOOL_AR, ld: $SRS_TOOL_LD, randlib: $SRS_TOOL_RANDLIB"; exit -1
+    if [[ $SRS_TOOL_CC == '' ||  $SRS_TOOL_CXX == '' ||  $SRS_TOOL_AR == '' ||  $SRS_TOOL_LD == '' ||  $SRS_TOOL_RANLIB == '' ]]; then
+        echo "Error: No build toolchain, cc: $SRS_TOOL_CC, cxx: $SRS_TOOL_CXX, ar: $SRS_TOOL_AR, ld: $SRS_TOOL_LD, ranlib: $SRS_TOOL_RANLIB"; exit -1
     fi
 
     if [[ $SRS_CROSS_BUILD == YES && ($SRS_TOOL_CC == 'gcc' || $SRS_TOOL_CXX == 'g++' || $SRS_TOOL_AR == 'ar') ]]; then
