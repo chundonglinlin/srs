@@ -102,6 +102,7 @@ SrsIngester::~SrsIngester()
     _srs_config->unsubscribe(this);
     
     srs_freep(trd);
+    srs_freep(pprint);
     clear_engines();
 }
 
