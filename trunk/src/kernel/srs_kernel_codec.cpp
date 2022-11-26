@@ -416,6 +416,37 @@ string srs_avc_level2str(SrsAvcLevel level)
     }
 }
 
+string srs_hevc_profile2str(SrsHevcProfile profile)
+{
+    switch (profile) {
+        case SrsHevcProfileMain: return "Main";
+        case SrsHevcProfileMain10: return "Main 10";
+        case SrsHevcProfileMainStillPicture: return "Main Still Picture";
+        case SrsHevcProfileRext: return "Rext";
+        default: return "Other";
+    }
+}
+
+string srs_hevc_level2str(SrsHevcLevel level)
+{
+    switch (level) {
+        case SrsHevcLevel_1: return "1";
+        case SrsHevcLevel_2: return "2";
+        case SrsHevcLevel_21: return "2.1";
+        case SrsHevcLevel_3: return "3";
+        case SrsHevcLevel_31: return "3.1";
+        case SrsHevcLevel_4: return "4";
+        case SrsHevcLevel_41: return "4.1";
+        case SrsHevcLevel_5: return "5";
+        case SrsHevcLevel_51: return "5.1";
+        case SrsHevcLevel_52: return "5.2";
+        case SrsHevcLevel_6: return "6";
+        case SrsHevcLevel_61: return "6.1";
+        case SrsHevcLevel_62: return "6.2";
+        default: return "Other";
+    }
+}
+
 SrsSample::SrsSample()
 {
     size = 0;
@@ -843,7 +874,7 @@ srs_error_t SrsFormat::video_avc_demux(SrsBuffer* stream, int64_t timestamp)
 #ifdef SRS_H265
         if (avc_packet_type == SrsVideoAvcFrameTraitSequenceHeader) {
             // TODO: demux vps/sps/pps for hevc
-            if ((err = hevc_demux_hvcc(stream)) != srs_success) {
+            if ((err = hvcc_demux_sps_pps(stream)) != srs_success) {
                 return srs_error_wrap(err, "demux hevc SPS/PPS");
             }
         } else if (avc_packet_type == SrsVideoAvcFrameTraitNALU) {
@@ -880,7 +911,7 @@ srs_error_t SrsFormat::video_avc_demux(SrsBuffer* stream, int64_t timestamp)
 
 #ifdef SRS_H265
 // Parse the hevc vps/sps/pps
-srs_error_t SrsFormat::hevc_demux_hvcc(SrsBuffer* stream)
+srs_error_t SrsFormat::hvcc_demux_sps_pps(SrsBuffer* stream)
 {
     int avc_extra_size = stream->size() - stream->pos();
     if (avc_extra_size > 0) {
@@ -987,12 +1018,47 @@ srs_error_t SrsFormat::hevc_demux_hvcc(SrsBuffer* stream)
             srs_info("hevc nalu type:%d, array_completeness:%d, num_nalus:%d, i:%d, nal_unit_length:%d",
                 hevc_unit.nal_unit_type, hevc_unit.array_completeness, hevc_unit.num_nalus, i, data_item.nal_unit_length);
             hevc_unit.nal_data_vec.push_back(data_item);
+
+            //demux sps
+            if (hevc_unit.nal_unit_type == SrsHevcNaluType_SPS && hvcc_demux_sps(&data_item) != srs_success) {
+                srs_warn("hvcc demux sps failed!");
+            }
         }
         dec_conf_rec_p->nalu_vec.push_back(hevc_unit);
     }
 
     return srs_success;
 }
+
+srs_error_t SrsFormat::hvcc_demux_sps(SrsHevcNalData* data)
+{
+    srs_error_t err = srs_success;
+
+    char* sps = (char*)&data->nal_unit_data[0];
+    int nbsps = data->nal_unit_length;
+
+    SrsBuffer stream(sps, nbsps);
+
+    // for NALU, ITU-T H.265 7.3.2.2 Sequence parameter set RBSP syntax
+    // T-REC-H.265-202108-I!!PDF-E.pdf, page 61.
+    if (!stream.require(1)) {
+        return srs_error_new(ERROR_HLS_DECODE_ERROR, "decode SPS");
+    }
+
+    /*
+     * seq_parameter_set_rbsp
+     *      sps_video_parameter_set_id              4 bits
+     *      sps_max_sub_layers_minus1               3 bits
+     *      sps_temporal_id_nesting_flag            1 bit
+     */
+    int seq_parameter_set_rbsp = stream.read_1bytes();
+    int sps_video_parameter_set_id = (seq_parameter_set_rbsp >> 4) & 0x0F;
+    int sps_max_sub_layers_minus1 = (seq_parameter_set_rbsp >> 1) & 0x03;
+    int sps_temporal_id_nesting_flag = seq_parameter_set_rbsp & 0x01;
+
+    return err;
+}
+
 #endif
 
 srs_error_t SrsFormat::avc_demux_sps_pps(SrsBuffer* stream)

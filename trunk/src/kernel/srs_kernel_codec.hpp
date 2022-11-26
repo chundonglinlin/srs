@@ -502,6 +502,7 @@ struct SrsHevcDecoderConfigurationRecord {
     uint8_t  length_size_minus_one;
     std::vector<SrsHevcHvccNalu> nalu_vec;
 };
+
 #endif
 
 /**
@@ -626,6 +627,46 @@ enum SrsAvcLevel
     SrsAvcLevel_51 = 51,
 };
 std::string srs_avc_level2str(SrsAvcLevel level);
+
+/**
+ * the profile for hevc/h.265.
+ * @see Annex A Profiles and levels, T-REC-H.265-202108-I!!PDF-E.pdf, page 559.
+ */
+enum SrsHevcProfile
+{
+    SrsHevcProfileReserved = 0,
+
+    // @see ffmpeg, libavcodec/avcodec.h:2986
+    SrsHevcProfileMain= 1,
+    SrsHevcProfileMain10= 2,
+    SrsHevcProfileMainStillPicture= 3,
+    SrsHevcProfileRext= 4,
+};
+std::string srs_hevc_profile2str(SrsHevcProfile profile);
+
+/**
+ * the level for hevc/h.265.
+ * @see Annex A Profiles and levels, T-REC-H.265-202108-I!!PDF-E.pdf, page 684.
+ */
+enum SrsHevcLevel
+{
+    SrsHevcLevelReserved = 0,
+
+    SrsHevcLevel_1   = 30,
+    SrsHevcLevel_2   = 60,
+    SrsHevcLevel_21 = 63,
+    SrsHevcLevel_3   = 90,
+    SrsHevcLevel_31 = 93,
+    SrsHevcLevel_4   = 120,
+    SrsHevcLevel_41 = 123,
+    SrsHevcLevel_5   = 150,
+    SrsHevcLevel_51 = 153,
+    SrsHevcLevel_52 = 156,
+    SrsHevcLevel_6   = 180,
+    SrsHevcLevel_61 = 183,
+    SrsHevcLevel_62 = 186,
+};
+std::string srs_hevc_level2str(SrsHevcLevel level);
 
 /**
  * A sample is the unit of frame.
@@ -873,7 +914,8 @@ private:
     virtual srs_error_t video_avc_demux(SrsBuffer* stream, int64_t timestamp);
 #ifdef SRS_H265
 private:
-    virtual srs_error_t hevc_demux_hvcc(SrsBuffer* stream);
+    virtual srs_error_t hvcc_demux_sps_pps(SrsBuffer* stream);
+    virtual srs_error_t hvcc_demux_sps(SrsHevcNalData* data);
 #endif
 private:
     // Parse the H.264 SPS/PPS.
