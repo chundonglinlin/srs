@@ -141,10 +141,19 @@ srs_error_t SrsStatisticStream::dumps(SrsJsonObject* obj)
     } else {
         SrsJsonObject* video = SrsJsonAny::object();
         obj->set("video", video);
-        
+
+        std::string profile,level;
+        if (vcodec == SrsVideoCodecIdAVC) {
+            profile = srs_avc_profile2str(avc_profile);
+            level = srs_avc_level2str(avc_level);
+        } else if (vcodec == SrsVideoCodecIdHEVC) {
+            profile = srs_hevc_profile2str(hevc_profile);
+            level = srs_hevc_level2str(hevc_level);
+        }
+
         video->set("codec", SrsJsonAny::str(srs_video_codec_id2str(vcodec).c_str()));
-        video->set("profile", SrsJsonAny::str(srs_avc_profile2str(avc_profile).c_str()));
-        video->set("level", SrsJsonAny::str(srs_avc_level2str(avc_level).c_str()));
+        video->set("profile", SrsJsonAny::str(profile.c_str()));
+        video->set("level", SrsJsonAny::str(level.c_str()));
         video->set("width", SrsJsonAny::integer(width));
         video->set("height", SrsJsonAny::integer(height));
     }
@@ -335,7 +344,7 @@ SrsStatisticClient* SrsStatistic::find_client(string client_id)
     return NULL;
 }
 
-srs_error_t SrsStatistic::on_video_info(SrsRequest* req, SrsVideoCodecId vcodec, SrsAvcProfile avc_profile, SrsAvcLevel avc_level, int width, int height)
+srs_error_t SrsStatistic::on_video_info(SrsRequest* req, SrsVideoCodecId vcodec, int profile, int level, int width, int height)
 {
     srs_error_t err = srs_success;
     
@@ -344,9 +353,15 @@ srs_error_t SrsStatistic::on_video_info(SrsRequest* req, SrsVideoCodecId vcodec,
     
     stream->has_video = true;
     stream->vcodec = vcodec;
-    stream->avc_profile = avc_profile;
-    stream->avc_level = avc_level;
-    
+
+    if (vcodec == SrsVideoCodecIdAVC) {
+        stream->avc_profile = (SrsAvcProfile)profile;
+        stream->avc_level = (SrsAvcLevel)level;
+    } else if (vcodec == SrsVideoCodecIdHEVC) {
+        stream->hevc_profile = (SrsHevcProfile)profile;
+        stream->hevc_level = (SrsHevcLevel)level;
+    }
+
     stream->width = width;
     stream->height = height;
     
