@@ -21,6 +21,7 @@ class SrsRtmpClient;
 class SrsStSocket;
 class SrsRequest;
 class SrsRawH264Stream;
+class SrsRawHEVCStream;
 class SrsSharedPtrMessage;
 class SrsRawAacStream;
 struct SrsRawAacStreamCodec;
@@ -82,6 +83,15 @@ private:
     bool h264_pps_changed;
     bool h264_sps_pps_sent;
 private:
+    SrsRawHEVCStream* hevc_;
+    std::string hevc_vps_;
+    bool hevc_vps_changed_;
+    std::string hevc_sps_;
+    bool hevc_sps_changed_;
+    std::string hevc_pps_;
+    bool hevc_pps_changed_;
+    bool hevc_sps_pps_sent_;
+private:
     SrsRawAacStream* aac;
     std::string aac_specific_config;
 private:
@@ -106,6 +116,9 @@ private:
     virtual srs_error_t write_h264_ipb_frame(char* frame, int frame_size, uint32_t dts, uint32_t pts);
     virtual srs_error_t on_ts_audio(SrsTsMessage* msg, SrsBuffer* avs);
     virtual srs_error_t write_audio_raw_frame(char* frame, int frame_size, SrsRawAacStreamCodec* codec, uint32_t dts);
+    virtual srs_error_t on_ts_hevc(SrsTsMessage *msg, SrsBuffer *avs);
+    virtual srs_error_t write_hevc_sps_pps(uint32_t dts, uint32_t pts);
+    virtual srs_error_t write_hevc_ipb_frame(char *frame, int frame_size, uint32_t dts, uint32_t pts);
 private:
     virtual srs_error_t rtmp_write_packet(char type, uint32_t timestamp, char* data, int size);
 private:

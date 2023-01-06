@@ -160,12 +160,20 @@ SrsMpegtsOverUdp::SrsMpegtsOverUdp()
     buffer = new SrsSimpleStream();
     
     sdk = NULL;
-    
+
     avc = new SrsRawH264Stream();
+    hevc_ = new SrsRawHEVCStream();
     aac = new SrsRawAacStream();
+
     h264_sps_changed = false;
     h264_pps_changed = false;
     h264_sps_pps_sent = false;
+
+    hevc_vps_changed_ = false;
+    hevc_sps_changed_ = false;
+    hevc_pps_changed_ = false;
+    hevc_sps_pps_sent_ = false;
+
     queue = new SrsMpegtsQueue();
     pprint = SrsPithyPrint::create_caster();
 }
@@ -177,6 +185,7 @@ SrsMpegtsOverUdp::~SrsMpegtsOverUdp()
     srs_freep(buffer);
     srs_freep(context);
     srs_freep(avc);
+    srs_freep(hevc_);
     srs_freep(aac);
     srs_freep(queue);
     srs_freep(pprint);
@@ -351,7 +360,7 @@ srs_error_t SrsMpegtsOverUdp::on_ts_message(SrsTsMessage* msg)
     }
     
     // check supported codec
-    if (msg->channel->stream != SrsTsStreamVideoH264 && msg->channel->stream != SrsTsStreamAudioAAC) {
+    if (msg->channel->stream != SrsTsStreamVideoH264 && msg->channel->stream != SrsTsStreamVideoHEVC && msg->channel->stream != SrsTsStreamAudioAAC) {
         return srs_error_new(ERROR_STREAM_CASTER_TS_CODEC, "ts: unsupported stream codec=%d", msg->channel->stream);
     }
     
@@ -369,8 +378,14 @@ srs_error_t SrsMpegtsOverUdp::on_ts_message(SrsTsMessage* msg)
             return srs_error_wrap(err, "ts: consume audio");
         }
     }
-    
+
     // TODO: FIXME: implements it.
+    if (msg->channel->stream == SrsTsStreamVideoHEVC) {
+        if ((err = on_ts_hevc(msg, &avs)) != srs_success) {
+            return srs_error_wrap(err, "ts: consume hevc video");
+        }
+    }
+
     return err;
 }
 
@@ -527,6 +542,195 @@ srs_error_t SrsMpegtsOverUdp::write_h264_ipb_frame(char* frame, int frame_size, 
         return srs_error_wrap(err, "mux avc to flv");
     }
     
+    // the timestamp in rtmp message header is dts.
+    uint32_t timestamp = dts;
+    return rtmp_write_packet(SrsFrameTypeVideo, timestamp, flv, nb_flv);
+}
+
+srs_error_t SrsMpegtsOverUdp::on_ts_hevc(SrsTsMessage* msg, SrsBuffer* avs)
+{
+    srs_error_t err = srs_success;
+
+    // ensure rtmp connected.
+    if ((err = connect()) != srs_success) {
+        return srs_error_wrap(err, "connect");
+    }
+
+    // ts tbn to flv tbn.
+    uint32_t dts = (uint32_t)(msg->dts / 90);
+    uint32_t pts = (uint32_t)(msg->dts / 90);
+
+    // send each frame.
+    while (!avs->empty()) {
+        char* frame = NULL;
+        int frame_size = 0;
+        if ((err = hevc_->annexb_demux(avs, &frame, &frame_size)) != srs_success) {
+            return srs_error_wrap(err, "demux annexb");
+        }
+
+        // 5bits, 7.3.1 NAL unit syntax,
+        // ISO_IEC_14496-10-AVC-2003.pdf, page 44.
+        //  7: SPS, 8: PPS, 5: I Frame, 1: P Frame
+        SrsHevcNaluType nal_unit_type = (SrsHevcNaluType)((frame[0] & 0x7E) >> 1);
+
+        // ignore the nalu type sps(7), pps(8), aud(9)
+        if (nal_unit_type == SrsHevcNaluType_ACCESS_UNIT_DELIMITER) {
+            continue;
+        }
+
+        // TODO: FIXME: Should cache this config, it's better not to get it for each video frame.
+        if (_srs_config->get_srt_sei_filter()) {
+            if (nal_unit_type == SrsHevcNaluType_SEI || nal_unit_type == SrsHevcNaluType_SEI) {
+                continue;
+            }
+        }
+
+        // for vps
+        if (hevc_->is_vps(frame, frame_size)) {
+            std::string vps;
+            if ((err = hevc_->vps_demux(frame, frame_size, vps)) != srs_success) {
+                return srs_error_wrap(err, "hevc demux vps");
+            }
+
+            if (hevc_vps_ == vps) {
+                continue;
+            }
+            hevc_vps_changed_ = true;
+            hevc_vps_ = vps;
+
+            //write hevc vps_sps_pps
+            if ((err = write_hevc_sps_pps(dts, pts)) != srs_success) {
+                return srs_error_wrap(err, "hevc write vps/sps/pps");
+            }
+            continue;
+        }
+
+        // for sps
+        if (hevc_->is_sps(frame, frame_size)) {
+            std::string sps;
+            if ((err = hevc_->sps_demux(frame, frame_size, sps)) != srs_success) {
+                return srs_error_wrap(err, "demux sps");
+            }
+
+            if (hevc_sps_ == sps) {
+                continue;
+            }
+            hevc_sps_changed_ = true;
+            hevc_sps_ = sps;
+
+            //write hevc vps_sps_pps
+            if ((err = write_hevc_sps_pps(dts, pts)) != srs_success) {
+                return srs_error_wrap(err, "write sps/pps");
+            }
+            continue;
+        }
+
+        // for pps
+        if (hevc_->is_pps(frame, frame_size)) {
+            std::string pps;
+            if ((err = hevc_->pps_demux(frame, frame_size, pps)) != srs_success) {
+                return srs_error_wrap(err, "demux pps");
+            }
+
+            if (hevc_pps_ == pps) {
+                continue;
+            }
+            hevc_pps_changed_ = true;
+            hevc_pps_ = pps;
+
+            if ((err = write_hevc_sps_pps(dts, pts)) != srs_success) {
+                return srs_error_wrap(err, "write sps/pps");
+            }
+            continue;
+        }
+
+        // ibp frame.
+        // TODO: FIXME: we should group all frames to a rtmp/flv message from one ts message.
+        srs_info("mpegts: demux hevc ibp frame size=%d, dts=%d", frame_size, dts);
+        if ((err = write_hevc_ipb_frame(frame, frame_size, dts, pts)) != srs_success) {
+            return srs_error_wrap(err, "write hevc frame");
+        }
+    }
+
+    return err;
+}
+
+srs_error_t SrsMpegtsOverUdp::write_hevc_sps_pps(uint32_t dts, uint32_t pts)
+{
+    srs_error_t err = srs_success;
+
+    // TODO: FIMXE: there exists bug, see following comments.
+    // when sps or pps changed, update the sequence header,
+    // for the pps maybe not changed while sps changed.
+    // so, we must check when each video ts message frame parsed.
+    if (!hevc_sps_changed_ || !hevc_pps_changed_ || !hevc_vps_changed_) {
+        return err;
+    }
+
+    // hevc raw to hevc packet.
+    std::string sh;
+    if ((err = hevc_->mux_sequence_header(hevc_sps_, hevc_pps_, hevc_vps_, sh)) != srs_success) {
+        return srs_error_wrap(err, "mux sequence header");
+    }
+
+    // hevc packet to flv packet.
+    int8_t frame_type = SrsVideoAvcFrameTypeKeyFrame;
+    int8_t avc_packet_type = SrsVideoAvcFrameTraitSequenceHeader;
+    char* flv = NULL;
+    int nb_flv = 0;
+    if ((err = hevc_->mux_avc2flv(sh, frame_type, avc_packet_type, dts, pts, &flv, &nb_flv)) != srs_success) {
+        return srs_error_wrap(err, "avc to flv");
+    }
+
+    // the timestamp in rtmp message header is dts.
+    uint32_t timestamp = dts;
+    if ((err = rtmp_write_packet(SrsFrameTypeVideo, timestamp, flv, nb_flv)) != srs_success) {
+        return srs_error_wrap(err, "write packet");
+    }
+
+    // reset vps, sps and pps.
+    hevc_vps_changed_ = false;
+    hevc_sps_changed_ = false;
+    hevc_pps_changed_ = false;
+
+    hevc_sps_pps_sent_ = true;
+
+    return err;
+}
+
+srs_error_t SrsMpegtsOverUdp::write_hevc_ipb_frame(char *frame, int frame_size, uint32_t dts, uint32_t pts)
+{
+    srs_error_t err = srs_success;
+
+    // when vps, sps or pps not sent, ignore the packet.
+    if (!hevc_sps_pps_sent_){
+        return srs_error_new(ERROR_HEVC_DROP_BEFORE_SPS_PPS, "drop hevc vps/sps/pps");
+    }
+
+    // 5bits, 7.3.1 NAL unit syntax,
+    // ISO_IEC_14496-10-AVC-2003.pdf, page 44.
+    //  7: SPS, 8: PPS, 5: I Frame, 1: P Frame
+    SrsHevcNaluType nal_unit_type = (SrsHevcNaluType)((frame[0] & 0x7E) >> 1);
+
+    // for IDR frame, the frame is keyframe.
+    SrsVideoAvcFrameType frame_type = SrsVideoAvcFrameTypeInterFrame;
+
+    if ((nal_unit_type >= SrsHevcNaluType_CODED_SLICE_BLA) && (nal_unit_type <= SrsHevcNaluType_RESERVED_23)) {
+        frame_type = SrsVideoAvcFrameTypeKeyFrame;
+    }
+
+    std::string ibp;
+    if ((err = hevc_->mux_ipb_frame(frame, frame_size, ibp)) != srs_success) {
+        return srs_error_wrap(err, "mux frame");
+    }
+
+    int8_t avc_packet_type = SrsVideoAvcFrameTraitNALU;
+    char *flv = NULL;
+    int nb_flv = 0;
+    if ((err = hevc_->mux_avc2flv(ibp, frame_type, avc_packet_type, dts, pts, &flv, &nb_flv)) != srs_success) {
+        return srs_error_wrap(err, "mux avc to flv");
+    }
+
     // the timestamp in rtmp message header is dts.
     uint32_t timestamp = dts;
     return rtmp_write_packet(SrsFrameTypeVideo, timestamp, flv, nb_flv);
