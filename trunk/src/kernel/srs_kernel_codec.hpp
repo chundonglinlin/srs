@@ -273,6 +273,11 @@ public:
      * @remark all type of audio is possible, no need to check audio.
      */
     static bool acceptable(char* data, int size);
+    /**
+     * check the video RTMP/flv extended header info,
+     * @doc enhanced-rtmp-v1.pdf, page 6
+     */
+    static bool is_exheader(char* data, int size);
 };
 
 /**

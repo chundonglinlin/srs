@@ -164,8 +164,13 @@ bool SrsFlvVideo::sh(char* data, int size)
 {
     // Check sequence header only for H.264 or H.265
     bool codec_ok = h264(data, size);
+    bool exheader = is_exheader(data, size);
 #ifdef SRS_H265
-    codec_ok = codec_ok? true : hevc(data, size);
+    if (exheader){
+        codec_ok = true;
+    } else {
+        codec_ok = codec_ok ? true : hevc(data, size);
+    }
 #endif
     if (!codec_ok) return false;
 
@@ -175,10 +180,14 @@ bool SrsFlvVideo::sh(char* data, int size)
     }
     
     char frame_type = data[0];
-    frame_type = (frame_type >> 4) & 0x0F;
-    
     char avc_packet_type = data[1];
-    
+    if (exheader) {
+        avc_packet_type = frame_type & 0x0F;
+        frame_type = (frame_type >> 4) & 0x07;
+    } else {
+        frame_type = (frame_type >> 4) & 0x0F;
+    }
+
     return frame_type == SrsVideoAvcFrameTypeKeyFrame
     && avc_packet_type == SrsVideoAvcFrameTraitSequenceHeader;
 }
@@ -217,7 +226,11 @@ bool SrsFlvVideo::acceptable(char* data, int size)
     if (size < 1) {
         return false;
     }
-    
+
+    if (is_exheader(data, size)) {
+        return true;
+    }
+
     char frame_type = data[0];
     SrsVideoCodecId codec_id = (SrsVideoCodecId)(uint8_t)(frame_type & 0x0f);
     frame_type = (frame_type >> 4) & 0x0f;
@@ -231,6 +244,29 @@ bool SrsFlvVideo::acceptable(char* data, int size)
     }
     
     return true;
+}
+
+bool SrsFlvVideo::is_exheader(char* data, int size)
+{
+    if (size < 1) {
+        return false;
+    }
+
+    char frame_type = data[0];
+    if (frame_type & 0x80) {
+        char packet_type = frame_type & 0x0f;
+        frame_type = (frame_type >> 4) & 0x07;
+
+        if (packet_type > 6 || frame_type > 7) {
+            return false;
+        }
+
+        srs_assert(size >= 5);
+
+        return srs_string_starts_with((char*)&data[1], "hvc1");
+    }
+
+    return false;
 }
 
 SrsFlvAudio::SrsFlvAudio()
@@ -786,6 +822,9 @@ srs_error_t SrsFormat::on_video(int64_t timestamp, char* data, int size)
     // Check codec for H.264 and H.265.
     bool codec_ok = (codec_id == SrsVideoCodecIdAVC);
 #ifdef SRS_H265
+    if (frame_type & 0x80) {
+        codec_ok = srs_string_starts_with((char *) &data[1], "hvc1");
+    }
     codec_ok = codec_ok ? true : (codec_id == SrsVideoCodecIdHEVC);
 #endif
     if (!codec_ok) return err;
@@ -851,7 +890,15 @@ srs_error_t SrsFormat::video_avc_demux(SrsBuffer* stream, int64_t timestamp)
     // @see: E.4.3 Video Tags, video_file_format_spec_v10_1.pdf, page 78
     int8_t frame_type = stream->read_1bytes();
     SrsVideoCodecId codec_id = (SrsVideoCodecId)(frame_type & 0x0f);
-    frame_type = (frame_type >> 4) & 0x0f;
+    bool exheader = false;
+    int8_t packet_type = 0;
+    if (frame_type & 0x80) {
+        exheader = true;
+        packet_type = frame_type & 0x0f;
+        frame_type = (frame_type >> 4) & 0x07;
+    } else {
+        frame_type = (frame_type >> 4) & 0x0f;
+    }
     
     video->frame_type = (SrsVideoAvcFrameType)frame_type;
     
@@ -865,6 +912,13 @@ srs_error_t SrsFormat::video_avc_demux(SrsBuffer* stream, int64_t timestamp)
     // Check codec for H.264 and H.265.
     bool codec_ok = (codec_id == SrsVideoCodecIdAVC);
 #ifdef SRS_H265
+    if (exheader) {
+        string fourcc = stream->read_string(4);
+        if (fourcc == "hvc1") {
+            codec_ok = true;
+            codec_id = SrsVideoCodecIdHEVC;
+        }
+    }
     codec_ok = codec_ok ? true : (codec_id == SrsVideoCodecIdHEVC);
 #endif
     if (!codec_ok) {
@@ -875,8 +929,16 @@ srs_error_t SrsFormat::video_avc_demux(SrsBuffer* stream, int64_t timestamp)
     if (!stream->require(4)) {
         return srs_error_new(ERROR_HLS_DECODE_ERROR, "avc decode avc_packet_type");
     }
-    int8_t avc_packet_type = stream->read_1bytes();
-    int32_t composition_time = stream->read_3bytes();
+
+    int8_t avc_packet_type = exheader ? packet_type : stream->read_1bytes();
+    int32_t composition_time = 0;
+    if (exheader) {
+        if (packet_type == 2) {
+            composition_time = stream->read_3bytes();
+        }
+    } else {
+        composition_time = stream->read_3bytes();
+    }
     
     // pts = dts + cts.
     video->dts = timestamp;
