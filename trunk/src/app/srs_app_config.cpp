@@ -2330,7 +2330,7 @@ srs_error_t SrsConfig::check_normal_config()
             && n != "inotify_auto_reload" && n != "auto_reload_for_docker" && n != "tcmalloc_release_rate"
             && n != "query_latest_version" && n != "first_wait_for_qlv" && n != "threads"
             && n != "circuit_breaker" && n != "is_full" && n != "in_docker" && n != "tencentcloud_cls"
-            && n != "exporter"
+            && n != "exporter" && n != "rtsp_server"
             ) {
             return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "illegal directive %s", n.c_str());
         }
@@ -8822,4 +8822,85 @@ SrsConfDirective* SrsConfig::get_stats_disk_device()
     }
     
     return conf;
+}
+
+bool SrsConfig::get_rtsp_server_enabled()
+{
+    SrsConfDirective* conf = root->get("rtsp_server");
+    return get_rtsp_server_enabled(conf);
+}
+
+bool SrsConfig::get_rtsp_server_enabled(SrsConfDirective* conf)
+{
+    SRS_OVERWRITE_BY_ENV_BOOL("srs.rtsp_server.enabled"); // SRS_RTSP_SERVER_ENABLED
+
+    static bool DEFAULT = false;
+
+    if (!conf) {
+        return DEFAULT;
+    }
+
+    conf = conf->get("enabled");
+    if (!conf || conf->arg0().empty()) {
+        return DEFAULT;
+    }
+
+    return SRS_CONF_PERFER_FALSE(conf->arg0());
+}
+
+int SrsConfig::get_rtsp_server_listen()
+{
+    SRS_OVERWRITE_BY_ENV_INT("srs.rtsp_server.listen"); // SRS_RTSP_SERVER_LISTEN
+
+    static int DEFAULT = 554;
+
+    SrsConfDirective* conf = root->get("rtsp_server");
+    if (!conf) {
+        return DEFAULT;
+    }
+
+    conf = conf->get("listen");
+    if (!conf || conf->arg0().empty()) {
+        return DEFAULT;
+    }
+
+    return ::atoi(conf->arg0().c_str());
+}
+
+int SrsConfig::get_rtsp_server_rtp_port_min()
+{
+    SRS_OVERWRITE_BY_ENV_INT("srs.rtsp_server.rtp_port_min"); // SRS_RTSP_SERVER_RTP_PORT_MIN
+
+    static int DEFAULT = 30000;
+
+    SrsConfDirective* conf = root->get("rtsp_server");
+    if (!conf) {
+        return DEFAULT;
+    }
+
+    conf = conf->get("rtp_port_min");
+    if (!conf || conf->arg0().empty()) {
+        return DEFAULT;
+    }
+
+    return ::atoi(conf->arg0().c_str());
+}
+
+int SrsConfig::get_rtsp_server_rtp_port_max()
+{
+    SRS_OVERWRITE_BY_ENV_INT("srs.rtsp_server.rtp_port_max"); // SRS_RTSP_SERVER_RTP_PORT_MAX
+
+    static int DEFAULT = 40000;
+
+    SrsConfDirective* conf = root->get("rtsp_server");
+    if (!conf) {
+        return DEFAULT;
+    }
+
+    conf = conf->get("rtp_port_max");
+    if (!conf || conf->arg0().empty()) {
+        return DEFAULT;
+    }
+
+    return ::atoi(conf->arg0().c_str());
 }
