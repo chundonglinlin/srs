@@ -8826,16 +8826,11 @@ SrsConfDirective* SrsConfig::get_stats_disk_device()
 
 bool SrsConfig::get_rtsp_server_enabled()
 {
-    SrsConfDirective* conf = root->get("rtsp_server");
-    return get_rtsp_server_enabled(conf);
-}
-
-bool SrsConfig::get_rtsp_server_enabled(SrsConfDirective* conf)
-{
     SRS_OVERWRITE_BY_ENV_BOOL("srs.rtsp_server.enabled"); // SRS_RTSP_SERVER_ENABLED
 
     static bool DEFAULT = false;
 
+    SrsConfDirective* conf = root->get("rtsp_server");
     if (!conf) {
         return DEFAULT;
     }
@@ -8848,11 +8843,11 @@ bool SrsConfig::get_rtsp_server_enabled(SrsConfDirective* conf)
     return SRS_CONF_PERFER_FALSE(conf->arg0());
 }
 
-int SrsConfig::get_rtsp_server_listen()
+string SrsConfig::get_rtsp_server_listen()
 {
-    SRS_OVERWRITE_BY_ENV_INT("srs.rtsp_server.listen"); // SRS_RTSP_SERVER_LISTEN
+    SRS_OVERWRITE_BY_ENV_STRING("srs.rtsp_server.listen"); // SRS_RTSP_SERVER_LISTEN
 
-    static int DEFAULT = 554;
+    static string DEFAULT = "554";
 
     SrsConfDirective* conf = root->get("rtsp_server");
     if (!conf) {
@@ -8864,7 +8859,7 @@ int SrsConfig::get_rtsp_server_listen()
         return DEFAULT;
     }
 
-    return ::atoi(conf->arg0().c_str());
+    return conf->arg0();
 }
 
 int SrsConfig::get_rtsp_server_rtp_port_min()

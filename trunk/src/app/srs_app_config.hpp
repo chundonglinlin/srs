@@ -1138,8 +1138,7 @@ public:
     virtual std::string get_exporter_tag();
     // Get Rtsp server config.
     virtual bool get_rtsp_server_enabled();
-    virtual bool get_rtsp_server_enabled(SrsConfDirective* conf);
-    virtual int get_rtsp_server_listen();
+    virtual std::string get_rtsp_server_listen();
     virtual int get_rtsp_server_rtp_port_min();
     virtual int get_rtsp_server_rtp_port_max();
 };

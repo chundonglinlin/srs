@@ -43,6 +43,7 @@ using namespace std;
 #ifdef SRS_GB28181
 #include <srs_app_gb28181.hpp>
 #endif
+#include <srs_app_rtsp.hpp>
 
 SrsSignalManager* SrsSignalManager::instance = NULL;
 
@@ -342,6 +343,7 @@ SrsServer::SrsServer()
 #ifdef SRS_GB28181
     stream_caster_gb28181_ = new SrsGbListener();
 #endif
+    rtsp_listener_ = new SrsTcpListener(this);
 
     // donot new object in constructor,
     // for some global instance is not ready now,
@@ -401,6 +403,7 @@ void SrsServer::destroy()
 #ifdef SRS_GB28181
     srs_freep(stream_caster_gb28181_);
 #endif
+    srs_freep(rtsp_listener_);
 }
 
 void SrsServer::dispose()
@@ -420,6 +423,7 @@ void SrsServer::dispose()
 #ifdef SRS_GB28181
     stream_caster_gb28181_->close();
 #endif
+    rtsp_listener_->close();
 
     // Fast stop to notify FFMPEG to quit, wait for a while then fast kill.
     ingester->dispose();
@@ -451,6 +455,7 @@ void SrsServer::gracefully_dispose()
 #ifdef SRS_GB28181
     stream_caster_gb28181_->close();
 #endif
+    rtsp_listener_->close();
     srs_trace("listeners closed");
 
     // Fast stop to notify FFMPEG to quit, wait for a while then fast kill.
@@ -671,6 +676,14 @@ srs_error_t SrsServer::listen()
         exporter_listener_->set_endpoint(_srs_config->get_exporter_listen())->set_label("Exporter-Server");
         if ((err = exporter_listener_->listen()) != srs_success) {
             return srs_error_wrap(err, "exporter server listen");
+        }
+    }
+
+    // Create rtsp server listener.
+    if (_srs_config->get_rtsp_server_enabled()) {
+        rtsp_listener_->set_endpoint(_srs_config->get_rtsp_server_listen())->set_label("RTSP-Server");
+        if ((err = rtsp_listener_->listen()) != srs_success) {
+            return srs_error_wrap(err, "rtsp server listen");
         }
     }
 
@@ -1220,6 +1233,8 @@ srs_error_t SrsServer::do_on_tcp_client(ISrsListener* listener, srs_netfd_t& stf
             // TODO: FIXME: Maybe should support https metrics.
             bool is_https = false;
             resource = new SrsHttpxConn(is_https, this, new SrsTcpConnection(stfd2), http_api_mux, ip, port);
+        } else if (listener == rtsp_listener_) {
+            resource = new SrsRtspConn(new SrsTcpConnection(stfd2), ip, port, this);
         } else {
             srs_close_stfd(stfd2);
             srs_warn("Close for invalid fd=%d, ip=%s:%d", fd, ip.c_str(), port);

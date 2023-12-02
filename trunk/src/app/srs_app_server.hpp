@@ -137,6 +137,8 @@ private:
     // Exporter server listener, over TCP. Please note that metrics request of HTTP is served by this
     // listener, and it might be reused by HTTP API.
     SrsTcpListener* exporter_listener_;
+    // Rtsp server listener, over TCP.
+    SrsTcpListener* rtsp_listener_;
 #ifdef SRS_GB28181
     // Stream Caster for GB28181.
     SrsGbListener* stream_caster_gb28181_;
