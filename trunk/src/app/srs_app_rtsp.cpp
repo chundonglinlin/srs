@@ -235,8 +235,13 @@ srs_error_t SrsRtspConn::do_cycle()
             res->client_port_max = req->transport->client_port_max;
             res->local_port_min = lpm;
             res->local_port_max = lpm + 1;
-            res->video_ssrc = srs_random_str(8);
+            if (req->stream_id == video_id) {
+                res->video_ssrc = srs_random_str(8);
+            } else {
+                res->audio_ssrc = srs_random_str(8);
+            }
             res->session = session_id_;
+
             if ((err = rtsp_->send_message(res)) != srs_success) {
                 return srs_error_wrap(err, "response setup");
             }
@@ -247,6 +252,8 @@ srs_error_t SrsRtspConn::do_cycle()
             SrsRtspPlayResponse* res = new SrsRtspPlayResponse((int)req->seq);
             res->session = session_id_;
             res->content_base = req->uri;
+            res->track_seq[0] = 0;
+            res->track_seq[1] = 1;
 
             if ((err = rtsp_->send_message(res)) != srs_success) {
                 return srs_error_wrap(err, "response record");

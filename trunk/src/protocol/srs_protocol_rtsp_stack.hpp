@@ -555,7 +555,7 @@ class SrsRtspPlayResponse : public SrsRtspResponse
 public:
     // url
     std::string content_base;
-
+    int track_seq[2];
 public:
     SrsRtspPlayResponse(int cseq);
     virtual ~SrsRtspPlayResponse();

@@ -1131,6 +1131,12 @@ void SrsServer::resample_kbps()
         }
 #endif
 
+        SrsRtspConn* rtsp = dynamic_cast<SrsRtspConn*>(c);
+        if (rtsp) {
+            //stat->kbps_add_delta(c->get_id().c_str(), rtsp->delta());
+            continue;
+        }
+
         // Impossible path, because we only create these connections above.
         srs_assert(false);
     }

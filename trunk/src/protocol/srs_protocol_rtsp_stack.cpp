@@ -947,8 +947,8 @@ srs_error_t SrsRtspPlayResponse::encode_header(stringstream& ss)
     int rtptime = 1715609952;
 
     ss << "Range: npt=0.000-" << SRS_RTSP_CRLF;
-    ss << "RTP-Info: url=" << content_base << "/streamid=0;seq=" << seq << ";rtptime=" << rtptime;
-    ss << ",url=" << content_base << "/streamid=1;seq=" << (seq+5000) << ";rtptime=" << rtptime << SRS_RTSP_CRLF;
+    ss << "RTP-Info: url=" << content_base << "/trackID=0;seq=" << track_seq[0] << ";rtptime=" << rtptime;
+    ss << ",url=" << content_base << "/trackID=1;seq=" << track_seq[1] << ";rtptime=" << rtptime << SRS_RTSP_CRLF;
 
     return srs_success;
 }
@@ -993,6 +993,7 @@ srs_error_t SrsRtspStack::send_message(SrsRtspResponse* res)
     if ((err = skt->write((char*)str.c_str(), (int)str.length(), NULL)) != srs_success) {
         return srs_error_wrap(err, "write message");
     }
+    srs_trace("SrsRtspStack send_message end.");
     
     return err;
 }
