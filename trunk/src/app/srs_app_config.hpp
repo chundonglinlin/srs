@@ -1141,6 +1141,7 @@ public:
     virtual std::string get_rtsp_server_listen();
     virtual int get_rtsp_server_rtp_port_min();
     virtual int get_rtsp_server_rtp_port_max();
+    virtual bool get_rtsp_from_rtmp(std::string vhost);
 };
 
 #endif

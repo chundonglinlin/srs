@@ -2577,7 +2577,7 @@ srs_error_t SrsConfig::check_normal_config()
                 && n != "play" && n != "publish" && n != "cluster"
                 && n != "security" && n != "http_remux" && n != "dash"
                 && n != "http_static" && n != "hds" && n != "exec"
-                && n != "in_ack_size" && n != "out_ack_size" && n != "rtc" && n != "srt") {
+                && n != "in_ack_size" && n != "out_ack_size" && n != "rtc" && n != "srt" && n != "rtmp_to_rtsp") {
                 return srs_error_new(ERROR_SYSTEM_CONFIG_INVALID, "illegal vhost.%s", n.c_str());
             }
             // for each sub directives of vhost.
@@ -8898,4 +8898,23 @@ int SrsConfig::get_rtsp_server_rtp_port_max()
     }
 
     return ::atoi(conf->arg0().c_str());
+}
+
+bool SrsConfig::get_rtsp_from_rtmp(string vhost)
+{
+    SRS_OVERWRITE_BY_ENV_BOOL("srs.vhost.rtmp_to_rtsp"); // SRS_VHOST_RTMP_TO_RTC
+
+    static bool DEFAULT = false;
+
+    SrsConfDirective* conf = get_vhost(vhost);
+    if (!conf) {
+        return DEFAULT;
+    }
+
+    conf = conf->get("rtmp_to_rtsp");
+    if (!conf || conf->arg0().empty()) {
+        return DEFAULT;
+    }
+
+    return SRS_CONF_PERFER_FALSE(conf->arg0());
 }
