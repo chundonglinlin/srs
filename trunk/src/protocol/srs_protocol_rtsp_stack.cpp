@@ -617,29 +617,31 @@ string SrsRtspSdp::to_strings()
     a=fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=119056E500
     a=control:streamid=1
     */
-   
+
     stringstream ss;
 
     // title
     ss << "v=0" << SRS_RTSP_CRLF;
-    ss << "o=- 0 0 IN IP4 127.0.0.1" << SRS_RTSP_CRLF;
-    ss << "s=No Name" << SRS_RTSP_CRLF;
-    ss << "c=IN IP4 192.168.0.123" << SRS_RTSP_CRLF;
+    ss << "o=- 0 0 IN IP4 0.0.0.0" << SRS_RTSP_CRLF;
+    ss << "s=server" << SRS_RTSP_CRLF;
+    ss << "c=IN IP4 0.0.0.0" << SRS_RTSP_CRLF;
     ss << "t=0 0" << SRS_RTSP_CRLF;
-    ss << "a=tool:libavformat 58.76.100" << SRS_RTSP_CRLF;
+    //ss << "a=tool:libavformat 58.76.100" << SRS_RTSP_CRLF;
+    ss << "a=range:npt=now-" << SRS_RTSP_CRLF;
+    ss << "a=control:*" << SRS_RTSP_CRLF;
 
     // video
     ss << "m=video 0 RTP/AVP 96" << SRS_RTSP_CRLF;
     ss << "a=rtpmap:96 H264/90000" << SRS_RTSP_CRLF;
-    ss << "a=fmtp:96 packetization-mode=1; sprop-parameter-sets=Z2QAKKzZQHgCJ+XARAAAAwH0AABdqDxgxlg=,aOvjyyLA; profile-level-id=640028" << SRS_RTSP_CRLF;
-    ss << "a=control:streamid=0" << SRS_RTSP_CRLF;
+    ss << "=fmtp:96 packetization-mode=1; profile-level-id=64001F; sprop-parameter-sets=Z2QAH6zZQFAFuwEQAAA+kAALuADxgxlg,aOvjyyLA" << SRS_RTSP_CRLF;
+    ss << "a=control:trackID=0" << SRS_RTSP_CRLF;
 
     // audio
     ss << "m=audio 0 RTP/AVP 97" << SRS_RTSP_CRLF;
-    ss << "b=AS:128" << SRS_RTSP_CRLF;
+    ss << "b=AS:125" << SRS_RTSP_CRLF;
+    ss << "a=fmtp:98 streamtype=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=1210" << SRS_RTSP_CRLF;
     ss << "a=rtpmap:97 MPEG4-GENERIC/48000/2" << SRS_RTSP_CRLF;
-    ss << "a=fmtp:97 profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3; config=119056E500" << SRS_RTSP_CRLF;
-    ss << "a=control:streamid=1" << SRS_RTSP_CRLF;
+    ss << "a=control:trackID=1" << SRS_RTSP_CRLF;
 
     return ss.str(); 
 }
@@ -727,11 +729,6 @@ bool SrsRtspRequest::is_options()
     return method == SRS_METHOD_OPTIONS;
 }
 
-bool SrsRtspRequest::is_announce()
-{
-    return method == SRS_METHOD_ANNOUNCE;
-}
-
 bool SrsRtspRequest::is_describe()
 {
     return method == SRS_METHOD_DESCRIBE;
@@ -742,14 +739,24 @@ bool SrsRtspRequest::is_setup()
     return method == SRS_METHOD_SETUP;
 }
 
-bool SrsRtspRequest::is_record()
+bool SrsRtspRequest::is_announce()
 {
-    return method == SRS_METHOD_RECORD;
+    return method == SRS_METHOD_ANNOUNCE;
 }
 
 bool SrsRtspRequest::is_play()
 {
     return method == SRS_METHOD_PLAY;
+}
+
+bool SrsRtspRequest::is_record()
+{
+    return method == SRS_METHOD_RECORD;
+}
+
+bool SrsRtspRequest::is_teardown()
+{
+    return method == SRS_METHOD_TEARDOWN;
 }
 
 SrsRtspResponse::SrsRtspResponse(int cseq)
@@ -868,9 +875,9 @@ SrsRtspDescribeResponse::~SrsRtspDescribeResponse()
 srs_error_t SrsRtspDescribeResponse::encode_header(stringstream& ss)
 {
     ss << "Content-Base" << ":" << SRS_RTSP_SP << content_base << SRS_RTSP_CRLF;
-    
-    ss << "x-Accept-Retransmit: our-retransmit" << SRS_RTSP_CRLF;
+
     ss << "x-Accept-Dynamic-Rate: 1" << SRS_RTSP_CRLF;
+    ss << "x-Accept-Retransmit: our-retransmit" << SRS_RTSP_CRLF;
 
     string str = sdp->to_strings();
     if(!str.empty()){
@@ -907,11 +914,16 @@ SrsRtspSetupResponse::~SrsRtspSetupResponse()
 
 srs_error_t SrsRtspSetupResponse::encode_header(stringstream& ss)
 {
-    ss << SRS_RTSP_TOKEN_SESSION << ":" << SRS_RTSP_SP << session << SRS_RTSP_CRLF;
+    ss << SRS_RTSP_TOKEN_SESSION << ":" << SRS_RTSP_SP << session << ";timeout=60" << SRS_RTSP_CRLF;
     ss << SRS_RTSP_TOKEN_TRANSPORT << ":" << SRS_RTSP_SP
-    << "RTP/AVP;unicast;client_port=" << client_port_min << "-" << client_port_max << ";"
-    << "server_port=" << local_port_min << "-" << local_port_max
+        << "RTP/AVP/TCP;unicast;"
+        //<< "client_port=" << client_port_min << "-" << client_port_max << ";"
+        //<< "server_port=" << local_port_min << "-" << local_port_max << ";"
+        << "interleaved=0-1;" << "ssrc=" << video_ssrc << ";"
+        << "mode=\"play\"" << SRS_RTSP_CRLF
+        << "x-Dynamic-Rate: 1"
     << SRS_RTSP_CRLF;
+
     return srs_success;
 }
 
@@ -926,13 +938,13 @@ SrsRtspPlayResponse::~SrsRtspPlayResponse()
 srs_error_t SrsRtspPlayResponse::encode_header(stringstream& ss)
 {
     /*
-Range: npt=0.000-
-RTP-Info: url=rtsp://192.168.0.123:554/live/test/streamid=0;seq=7966;rtptime=-360677416,url=rtsp://192.168.0.123:554/live/test/streamid=1;seq=2708;rtptime=1715609952
-Server: ZLMediaKit(git hash:b127d8c,branch:master,build time:Mar 17 2022 18:09:45)
-Session: fYtpDpCre5aY
+        Range: npt=0.000-
+        RTP-Info: url=rtsp://192.168.0.123:554/live/test/streamid=0;seq=7966;rtptime=-360677416,url=rtsp://192.168.0.123:554/live/test/streamid=1;seq=2708;rtptime=1715609952
+        Server: ZLMediaKit(git hash:b127d8c,branch:master,build time:Mar 17 2022 18:09:45)
+        Session: fYtpDpCre5aY
     */
 
-   int rtptime = 1715609952;
+    int rtptime = 1715609952;
 
     ss << "Range: npt=0.000-" << SRS_RTSP_CRLF;
     ss << "RTP-Info: url=" << content_base << "/streamid=0;seq=" << seq << ";rtptime=" << rtptime;
@@ -1174,7 +1186,7 @@ srs_error_t SrsRtspStack::recv_token(std::string& token, SrsRtspTokenState& stat
             char buffer[SRS_RTSP_BUFFER];
             ssize_t nb_read = 0;
             if ((err = skt->read(buffer, SRS_RTSP_BUFFER, &nb_read)) != srs_success) {
-                return srs_error_wrap(err, "recv data");
+                return srs_error_wrap(err, "recv data %d", nb_read);
             }
             
             buf->append(buffer, (int)nb_read);

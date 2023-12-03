@@ -124,36 +124,67 @@ srs_error_t SrsRtspConn::do_cycle()
 
         SrsRtspRequest* req = NULL;
         if ((err = rtsp_->recv_message(&req)) != srs_success) {
+            srs_trace("rtsp recv_message failed, err=%s", srs_error_desc(err).c_str());
+
             return srs_error_wrap(err, "recv message");
         }
         SrsAutoFree(SrsRtspRequest, req);
+
+        // create session.
+        if (session_id_.empty()) {
+            session_id_ = srs_random_str(8);
+        }
+
         srs_trace("rtsp: got rtsp request: method=%s, uri=%s, CSeq:%d", req->method.c_str(), req->uri.c_str(), (int)req->seq);
-        
+
         if (req->is_options()) {
+            /**
+             * OPTIONS:
+             * OPTIONS rtsp://10.0.16.111:554/Streaming/Channels/101 RTSP/1.0
+             * CSeq: 1
+             * User-Agent: Lavf59.26.100
+
+             * RTSP/1.0 200 OK
+             * CSeq: 1
+             * Public: OPTIONS, DESCRIBE, PLAY, PAUSE, SETUP, TEARDOWN, SET_PARAMETER, GET_PARAMETER
+             * Date: Fri, Dec 01 2023 11:15:59 GMT
+             */
+
             SrsRtspOptionsResponse* res = new SrsRtspOptionsResponse((int)req->seq);
             res->session = session_id_;
             if ((err = rtsp_->send_message(res)) != srs_success) {
                 return  srs_error_wrap(err, "response option");
             }
-        } else if (req->is_announce()) {
-            // PUBLISH
         } else if (req->is_describe()) {
-            // create session.
-            std::string session = session_id_.empty() ? srs_random_str(8) : session_id_;
+            /**
+             * DESCRIBE:
+             * DESCRIBE rtsp://10.0.16.111:554/Streaming/Channels/101 RTSP/1.0
+             * Accept: application/sdp
+             * CSeq: 3
+             * User-Agent: Lavf59.26.100
+             * Authorization: Digest username="admin", realm="IP Camera(11266)", nonce="f6995a36c2ed0cccfb4e6c2a33a882c9", uri="rtsp://10.0.16.111:554/Streaming/Channels/101", response="9858265ba07711a41cb2ab44c9547c98"
+
+             * RTSP/1.0 200 OK
+             * CSeq: 3
+             * Content-Type: application/sdp
+             * Content-Base: rtsp://10.0.16.111:554/Streaming/Channels/101/
+             * Content-Length: 894
+             * SDP
+             */
 
             // rtsp description.
             SrsRtspDescribeResponse *res = new SrsRtspDescribeResponse((int)req->seq);
-            res->session = session;
+            res->session = session_id_;
             res->content_base = req->uri;
 
-            res->sdp = new SrsRtspSdp();
+            SrsRtspSdp* sdp = new SrsRtspSdp();
             /*
             res->sdp->video_stream_id = video_id;
             res->sdp->video_codec = video_codec;
             res->sdp->video_sps = h264_sps;
             res->sdp->video_pps = h264_pps;
             res->sdp->video_sample_rate = 90000;
-            //res->sdp->video_channel = 0;
+            res->sdp->video_channel = 0;
             res->sdp->video_payload_type = 96;
             res->sdp->video_protocol = "RTP/AVP";
             res->sdp->video_transport_format = "RAW/RAW/UDP";
@@ -166,18 +197,18 @@ srs_error_t SrsRtspConn::do_cycle()
             res->sdp->audio_protocol = "RTP/AVP";
             res->sdp->audio_transport_format = "RAW/RAW/UDP";
             */
+            res->sdp = sdp;
             if ((err = rtsp_->send_message(res)) != srs_success) {
                 return srs_error_wrap(err, "response describe");
             }
         } else if (req->is_setup()) {
             srs_assert(req->transport);
-            int lpm = 0;
 
+            int lpm = 0;
             /*
             if ((err = rtsp_->alloc_port(&lpm)) != srs_success) {
                 return srs_error_wrap(err, "alloc port");
             }
-
             SrsRtpConn* rtp = NULL;
             if (req->stream_id == video_id) {
                 srs_freep(video_rtp);
@@ -198,25 +229,20 @@ srs_error_t SrsRtspConn::do_cycle()
                 req->transport->cast_type.c_str(), req->transport->client_port_min, req->transport->client_port_max,
                 lpm, lpm + 1);
 
-            // create session.
-            std::string session = session_id_.empty() ? srs_random_str(8) : session_id_;
-
             // setup response.
             SrsRtspSetupResponse* res = new SrsRtspSetupResponse((int)req->seq);
             res->client_port_min = req->transport->client_port_min;
             res->client_port_max = req->transport->client_port_max;
             res->local_port_min = lpm;
             res->local_port_max = lpm + 1;
-            res->session = session;
+            res->video_ssrc = srs_random_str(8);
+            res->session = session_id_;
             if ((err = rtsp_->send_message(res)) != srs_success) {
                 return srs_error_wrap(err, "response setup");
             }
-        } else if (req->is_record()) {
-            SrsRtspResponse* res = new SrsRtspResponse((int)req->seq);
-            res->session = session_id_;
-            if ((err = rtsp_->send_message(res)) != srs_success) {
-                return srs_error_wrap(err, "response record");
-            }
+        } else if (req->is_announce()) {
+            // PUBLISH
+            srs_warn("rtsp: publish not support yet");
         } else if (req->is_play()) {
             SrsRtspPlayResponse* res = new SrsRtspPlayResponse((int)req->seq);
             res->session = session_id_;
@@ -224,6 +250,24 @@ srs_error_t SrsRtspConn::do_cycle()
 
             if ((err = rtsp_->send_message(res)) != srs_success) {
                 return srs_error_wrap(err, "response record");
+            }
+        } else if (req->is_record()) {
+            SrsRtspResponse* res = new SrsRtspResponse((int)req->seq);
+            res->session = session_id_;
+            if ((err = rtsp_->send_message(res)) != srs_success) {
+                return srs_error_wrap(err, "response record");
+            }
+        } else if (req->is_teardown()) {
+            SrsRtspResponse* res = new SrsRtspResponse((int)req->seq);
+            res->session = session_id_;
+            if ((err = rtsp_->send_message(res)) != srs_success) {
+                return srs_error_wrap(err, "response teardown");
+            }
+        } else {
+            SrsRtspResponse* res = new SrsRtspResponse((int)req->seq);
+            res->session = session_id_;
+            if ((err = rtsp_->send_message(res)) != srs_success) {
+                return srs_error_wrap(err, "response default");
             }
         }
     }

@@ -421,11 +421,12 @@ public:
     virtual ~SrsRtspRequest();
 public:
     virtual bool is_options();
-    virtual bool is_announce();
     virtual bool is_describe();
     virtual bool is_setup();
-    virtual bool is_record();
+    virtual bool is_announce();
     virtual bool is_play();
+    virtual bool is_record();
+    virtual bool is_teardown();
 };
 
 // The rtsp response message.
@@ -539,6 +540,9 @@ public:
     int local_port_max;
     // The session.
     std::string session;
+    // ssrc
+    std::string audio_ssrc;
+    std::string video_ssrc;
 public:
     SrsRtspSetupResponse(int cseq);
     virtual ~SrsRtspSetupResponse();
